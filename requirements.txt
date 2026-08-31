@@ -1,0 +1,26 @@
+# Production / Vercel runtime dependencies (lean; kept under the 500 MB
+# serverless function cap). xgboost, shap and lightgbm are intentionally
+# excluded: the classifier trains as a sklearn HistGradientBoosting model,
+# delay quantiles use HistGradientBoostingRegressor (no libgomp/native
+# dependency in the serverless runtime), and explanations use the
+# model-aware fallback. Full dev stack incl. xgboost/torch/shap/lightgbm
+# lives in requirements-dev.txt.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.5
+pydantic-settings>=2.2
+mangum>=0.17
+
+# Data (pinned to the environment that produced model artifacts)
+numpy==2.3.1
+pandas==2.3.0
+scipy==1.16.0
+duckdb>=1.0
+pyarrow>=15.0
+
+# ML (exact versions: model artifacts were trained & serialised with these)
+scikit-learn==1.8.0
+joblib==1.5.1
+
+# Graphs
+networkx>=3.0
