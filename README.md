@@ -1,4 +1,6 @@
-# Shipment Delay Prediction · Frankfurt → India
+# AI-Powered Predictive Risk & Decision Intelligence for Global Supply Chains
+
+> **Shipment Delay Prediction · Frankfurt → India**
 
 Probabilistic ETA and delay-risk prediction for a **Frankfurt → India** freight
 corridor. For every checkpoint on a route it produces:
