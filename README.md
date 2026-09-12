@@ -93,6 +93,7 @@ Detailed docs:
 - [API reference](docs/API.md) — every endpoint, request/response models
 - [Models](docs/MODELS.md) — features, algorithms, training CLI, metrics
 - [Deployment](docs/DEPLOYMENT.md) — Vercel serverless + configuration notes
+- [Task board](docs/TASKS.md) — parallel work lanes for splitting the build with friends
 
 ## Configuration
 
