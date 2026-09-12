@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
+import { clearSession, getSession, saveSession } from "./auth.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Header from "./components/Header.jsx";
+import LoginView from "./pages/LoginView.jsx";
 import OverviewView from "./pages/OverviewView.jsx";
 import RouteMapView from "./pages/RouteMapView.jsx";
 import RiskRadarView from "./pages/RiskRadarView.jsx";
@@ -30,6 +32,7 @@ const VIEWS = {
 };
 
 export default function App() {
+  const [user, setUser] = useState(() => getSession()?.username || null);
   const [view, setView] = useState("overview");
   const [route, setRoute] = useState(DEFAULT_ROUTE);
   const [nSim, setNSim] = useState(DEFAULT_NSIM);
@@ -84,10 +87,26 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (!user) return;
     loadRoutes();
     loadBase(DEFAULT_ROUTE, nSim);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadRoutes]);
+  }, [user, loadRoutes]);
+
+  const handleLogin = (username) => {
+    saveSession(username);
+    setUser(username);
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setUser(null);
+    setPrediction(null);
+    setExplanation(null);
+    setCritical(null);
+    setError(null);
+    setView("overview");
+  };
 
   const selectRoute = (routeId) => {
     setRoute(routeId);
@@ -106,6 +125,10 @@ export default function App() {
     onRouteChange: selectRoute,
   };
 
+  if (!user) {
+    return <LoginView onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app-shell">
       <Sidebar active={view} onSelect={setView} />
@@ -118,6 +141,8 @@ export default function App() {
           lastUpdated={lastUpdated}
           onRefresh={() => loadBase(route, nSim)}
           prediction={prediction}
+          user={user}
+          onLogout={handleLogout}
         />
 
         {error && <div className="banner error">API error: {error}</div>}

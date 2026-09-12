@@ -39,6 +39,21 @@ npm run build    # production build -> dist/
 |---|---|---|
 | `VITE_API_BASE` | backend base URL (build-time) | `/api/v1` (dev proxy) |
 
+## Auth (demo)
+
+The dashboard opens with a login screen (`src/pages/LoginView.jsx`, logic in
+`src/auth.js`). Default credentials:
+
+| Field | Value |
+|---|---|
+| Username | `admin` |
+| Password | `admin123` |
+
+The session persists in `localStorage`; signing out (header → Log out) clears
+it. This is a **demo-grade UI gate, not real security** — credentials live in
+the client bundle, so for production replace `validate()` with a backend login
+endpoint and a proper token.
+
 Production build inlines `VITE_API_BASE=https://shipment-delay-dashboard.vercel.app/api/v1`
 (see `docs/DEPLOYMENT.md`).
 

@@ -8,6 +8,8 @@ export default function Header({
   lastUpdated,
   onRefresh,
   prediction,
+  user,
+  onLogout,
 }) {
   const shipmentId = prediction?.shipment_id
     ? prediction.shipment_id.replace("frankfurt-final_destination", "FRK-IND-9281").toUpperCase()
@@ -39,6 +41,14 @@ export default function Header({
             ↻
           </button>
         </div>
+        {user && (
+          <div className="user-chip" title={`Signed in as ${user}`}>
+            <span className="user-name">{user}</span>
+            <button className="btn ghost logout-btn" onClick={onLogout} title="Sign out">
+              Log out
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
