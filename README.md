@@ -53,11 +53,11 @@ evaluates, runs the test suite, then launches the API
 ```bash
 pip install -r requirements.txt
 
-python -m core.train --generate-only   # generate + validate synthetic data
-python -m core.train --train-only      # train classifier + delay quantile models
-python -m core.train --eval-only       # evaluate and write metrics
+python -m backend.core.train --generate-only   # generate + validate synthetic data
+python -m backend.core.train --train-only      # train classifier + delay quantile models
+python -m backend.core.train --eval-only       # evaluate and write metrics
 
-uvicorn backend.main:app --port 8000   # API (http://127.0.0.1:8000/docs)
+uvicorn backend.app.main:app --port 8000   # API (http://127.0.0.1:8000/docs)
 
 cd frontend
 npm install
@@ -77,10 +77,11 @@ Two top-level stacks plus shared repo files:
 ```
 supply-chain-risk-ai/
 ├── frontend/     # React 18 + Vite dashboard  -> frontend/README.md
-└── backend/      # FastAPI backend (app)      -> backend/README.md
-    + core/       # ML engine (part of backend stack)
-    + api/        # Vercel serverless entrypoint (part of backend stack)
-    + tests/      # backend tests
+└── backend/      # FastAPI backend + ML engine -> backend/README.md
+    ├── app/      # FastAPI app (backend.app.*)
+    ├── core/     # ML engine (backend.core.*)
+    ├── api/      # Vercel serverless entrypoint
+    └── tests/    # backend tests
 ```
 
 ### Frontend — React (`frontend/`)
@@ -88,21 +89,20 @@ supply-chain-risk-ai/
 React 18 + Vite SPA: route map, risk views, ETA percentiles, simulator,
 explanations, reports. See [frontend/README.md](frontend/README.md).
 
-### Backend — FastAPI (`backend/` + `core/` + `api/` + `tests/`)
+### Backend — FastAPI (`backend/`)
 
-FastAPI app (`backend/`), ML engine (`core/`), serverless adapter (`api/`),
-tests (`tests/`). The Python code intentionally stays at repo root so import
-paths (`backend.*`, `core.*`) and the Vercel `api/index.py` entrypoint remain
-stable. See [backend/README.md](backend/README.md).
+FastAPI app (`backend/app/`), ML engine (`backend/core/`), serverless adapter
+(`backend/api/`), tests (`backend/tests/`). See
+[backend/README.md](backend/README.md).
 
 | Path | Stack | Purpose |
 |---|---|---|
 | `frontend/` | Frontend | React 18 + Vite dashboard |
-| `backend/` | Backend | FastAPI app: `main.py`, `api/routes.py`, `schemas/models.py` |
-| `core/` | Backend | Data, features, graph, models, simulation, explanation, routing engine |
-| `api/` | Backend | Vercel serverless entrypoint (`index.py`, Mangum ASGI adapter) |
-| `tests/` | Backend | `test_api.py` (HTTP), `test_core.py` (units), `test_engine.py` (slow E2E) |
-| `requirements.txt` / `requirements-dev.txt` | Backend | lean prod runtime / full dev stack |
+| `backend/app/` | Backend | FastAPI app: `main.py`, `api/routes.py`, `schemas/models.py` |
+| `backend/core/` | Backend | Data, features, graph, models, simulation, explanation, routing engine |
+| `backend/api/` | Backend | Vercel serverless entrypoint (`index.py`, Mangum ASGI adapter) |
+| `backend/tests/` | Backend | `test_api.py` (HTTP), `test_core.py` (units), `test_engine.py` (slow E2E) |
+| `backend/requirements.txt` / `backend/requirements-dev.txt` | Backend | lean prod runtime / full dev stack (`requirements*.txt` at root are shims) |
 | `artifacts/` | Backend | Trained model artifacts + `evaluation.json` (generated, git-ignored) |
 | `data/` | Backend | Synthetic data (generated, git-ignored) |
 | `docs/` | Shared | Architecture, API, deployment and model documentation |
@@ -116,7 +116,7 @@ Detailed docs:
 
 ## Configuration
 
-All settings live in `core/config.py` and can be overridden via environment
+All settings live in `backend/core/config.py` and can be overridden via environment
 variables (a `.env` file is supported). See [`.env.example`](.env.example) for
 the full list with defaults.
 

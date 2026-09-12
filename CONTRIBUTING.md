@@ -6,9 +6,9 @@ Thanks for helping out! This is a small, focused project — guidelines are shor
 
 ```bash
 pip install -r requirements-dev.txt   # full dev stack (xgboost, torch, shap, ...)
-python -m core.train --generate-only
-python -m core.train --train-only --no-xgboost
-python -m core.train --eval-only
+python -m backend.core.train --generate-only
+python -m backend.core.train --train-only --no-xgboost
+python -m backend.core.train --eval-only
 cd frontend && npm install
 ```
 
@@ -22,15 +22,16 @@ cd frontend && npm run build         # frontend type/build check
 
 ## Conventions
 
-- Follow the existing layout in `core/`, `backend/` and `frontend/`.
-- Routes go through `core/graph/topology.py` (data-driven) — never hardcode
+- Follow the existing layout in `backend/` (`app/`, `core/`, `api/`, `tests/`)
+  and `frontend/`.
+- Routes go through `backend/core/graph/topology.py` (data-driven) — never hardcode
   them in logic.
-- Thresholds and configuration belong in `core/config.py` / `.env.example`.
-- Keep the **lean `requirements.txt`** deployable: algorithms that the
+- Thresholds and configuration belong in `backend/core/config.py` / `.env.example`.
+- Keep the **lean `backend/requirements.txt`** deployable: algorithms that the
   production runtime needs must not require xgboost / lightgbm / torch / shap.
   Use `--no-xgboost` and the fallback paths already in place.
 - Quantile predictions must stay monotone (P50 ≤ P80 ≤ P90).
-- Add or update tests in `tests/`; mark integration tests that need trained
+- Add or update tests in `backend/tests/`; mark integration tests that need trained
   artifacts with `slow` (see `pytest.ini`).
 
 ## Submitting changes

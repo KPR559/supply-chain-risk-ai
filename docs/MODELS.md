@@ -14,7 +14,7 @@ A gradient-boosted classifier predicts `P(delay_hours > 24)` per node.
 - **Local/dev:** XGBoost via `requirements-dev.txt` (equivalent quality).
 
 Calibration: probability estimates are calibrated with **isotonic regression**
-`core/models/classification.py` (`_fit_isotonic`), fit on the training band and
+`backend/core/models/classification.py` (`_fit_isotonic`), fit on the training band and
 validated on validation, so the deployed probabilities are well-calibrated.
 
 The operating point is chosen to **maximise F1 on the validation split**
@@ -24,21 +24,21 @@ The operating point is chosen to **maximise F1 on the validation split**
 
 `HistGradientBoostingRegressor` with `loss="quantile"` per quantile
 `P50 / P80 / P90`, wrapped in a `MonotoneQuantile` that enforces
-**P50 ≤ P80 ≤ P90** per sample at prediction time (`core/models/delay.py`).
+**P50 ≤ P80 ≤ P90** per sample at prediction time (`backend/core/models/delay.py`).
 
 (An earlier LightGBM / XGBoost variant is no longer used because LightGBM's
 native `libgomp` dependency is unavailable on the serverless runtime.)
 
 ### Stage C — graph residual (optional)
 
-`DelayGAT` (`core/graph/gat.py`) is a small pure-PyTorch graph-attention net
+`DelayGAT` (`backend/core/graph/gat.py`) is a small pure-PyTorch graph-attention net
 (no `torch_geometric`) that learns upstream → downstream delay residual from
 the route adjacency. It is optional: if torch is unavailable the engine runs
 with the tabular propagation path.
 
 ### Stage D — Monte Carlo
 
-`core/simulation/monte_carlo.py` runs a vectorised simulation (default
+`backend/core/simulation/monte_carlo.py` runs a vectorised simulation (default
 10 000 samples): quantile-sampled node delays, log-normal edge transit times,
 damped downstream delay cascade, yielding ETA **percentiles**, **deadline-miss
 probability**, and **critical-node shares**.
@@ -49,10 +49,10 @@ probability**, and **critical-node shares**.
 `artifacts/feature_meta/groups.json`). All rolling/lag windows are
 leakage-free.
 
-## 3. Training CLI (`python -m core.train`)
+## 3. Training CLI (`python -m backend.core.train`)
 
 ```
-usage: core.train [-h] [--generate-only] [--train-only] [--eval-only]
+usage: backend.core.train [-h] [--generate-only] [--train-only] [--eval-only]
                   [--seed N] [--years N] [--version V] [--no-xgboost]
 ```
 
@@ -67,7 +67,7 @@ usage: core.train [-h] [--generate-only] [--train-only] [--eval-only]
 | `--version V` | artifact version tag (default `1.0.0`) |
 | `--no-xgboost` | use sklearn `HistGradientBoosting` instead of XGBoost (needed on Vercel) |
 
-Artifacts are saved to `artifacts/` via `core/models/registry.py`:
+Artifacts are saved to `artifacts/` via `backend/core/models/registry.py`:
 
 ```
 artifacts/
@@ -79,7 +79,7 @@ artifacts/
 ```
 
 > The classifier artifact is pickled with sklearn Cython components; running it
-> on Vercel needs the `_loss` pickle-alias workaround in `api/index.py`
+> on Vercel needs the `_loss` pickle-alias workaround in `backend/api/index.py`
 > (see `docs/DEPLOYMENT.md`).
 
 ## 4. Reference metrics (current artifacts)

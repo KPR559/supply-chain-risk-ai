@@ -7,11 +7,11 @@ Write-Host "==> Installing python deps"
 pip install -r requirements.txt -q
 
 Write-Host "==> Generating data + training + evaluating"
-python -m core.train --generate-only
+python -m backend.core.train --generate-only
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-python -m core.train --train-only
+python -m backend.core.train --train-only
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-python -m core.train --eval-only
+python -m backend.core.train --eval-only
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "==> Running tests"
@@ -25,7 +25,7 @@ if (-not (Test-Path "$root\frontend\node_modules")) {
 }
 
 Write-Host "==> Starting API on http://127.0.0.1:8000"
-$api = Start-Process python -ArgumentList "-m","uvicorn","backend.main:app","--host","127.0.0.1","--port","8000" -WorkingDirectory $root -PassThru -WindowStyle Hidden
+$api = Start-Process python -ArgumentList "-m","uvicorn","backend.app.main:app","--host","127.0.0.1","--port","8000" -WorkingDirectory $root -PassThru -WindowStyle Hidden
 
 Write-Host "==> Starting dashboard on http://127.0.0.1:5173"
 $vite = "$root\frontend\node_modules\.bin\vite.cmd"

@@ -18,9 +18,9 @@ bundle at build time.
 
 ## API project
 
-- Entrypoint `api/index.py` wraps the FastAPI app with **Mangum** (ASGI →
+- Entrypoint `backend/api/index.py` wraps the FastAPI app with **Mangum** (ASGI →
   API-Gateway adapter) and uses `lifespan="off"`.
-- `vercel.json` builds only `api/index.py` with
+- `vercel.json` builds only `backend/api/index.py` with
   `@vercel/python`, `runtime python3.11`, `maxLambdaSize 250mb`, and routes
   `/api/(.*)` to it.
 - **Lean `requirements.txt`** keeps the function under the Vercel 500 MB cap:
@@ -39,14 +39,14 @@ vercel env add VITE_API_BASE production   # https://shipment-delay-dashboard.ver
 ### Serverless caveats baked into the code
 
 1. **No LightGBM** — the delay quantiles use sklearn
-   `HistGradientBoostingRegressor` (`core/models/delay.py`), which has no
+   `HistGradientBoostingRegressor` (`backend/core/models/delay.py`), which has no
    compiled/native `libgomp` dependency. (A prior LightGBM deploy crashed on
    Vercel with `libgomp.so.1` missing.)
-2. **No torch / shap** — `core/graph/gat.py` and
-   `core/explain/shap_explainer.py` degrade gracefully; the API falls back to
+2. **No torch / shap** — `backend/core/graph/gat.py` and
+   `backend/core/explain/shap_explainer.py` degrade gracefully; the API falls back to
    tabular propagation and an importance-based explanation.
 3. **`_loss` pickle alias** — the saved classifier artifact references the
-   Cython class `_loss.CyHalfBinomialLoss`. `api/index.py` explicitly registers
+   Cython class `_loss.CyHalfBinomialLoss`. `backend/api/index.py` explicitly registers
    `sklearn._loss._loss` under the name `_loss` before unpickling, because the
    serverless Python 3.12 loader does **not** auto-register that alias. If you
    drop/retrain the artifact with a different sklearn version, re-check this.
@@ -87,6 +87,6 @@ vercel --prod --yes                                   # from frontend/
 The API is just FastAPI, so everything runs locally:
 
 ```bash
-uvicorn backend.main:app --port 8000
+uvicorn backend.app.main:app --port 8000
 cd frontend && npm run dev    # Vite proxies /api -> 127.0.0.1:8000
 ```

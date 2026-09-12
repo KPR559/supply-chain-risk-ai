@@ -40,22 +40,22 @@ Four stages, each with a clear output:
 Synthetic generation is seeded and deterministic:
 
 ```
-core/data/synthetic.py    generate observations, raw events, conflicts, alerts
-core/data/validation.py   schema cleaning (missing fields, bad GPS/durations, dupes)
-core/data/anomalies.py    regime detection (rolling z, CUSUM, binary segmentation, Isolation Forest)
-core/data/loaders.py      runtime loaders for alerts (NLP) and conflict events
-core/pipeline.py          orchestrates raw -> validate -> silver -> features -> ML dataset
+backend/core/data/synthetic.py    generate observations, raw events, conflicts, alerts
+backend/core/data/validation.py   schema cleaning (missing fields, bad GPS/durations, dupes)
+backend/core/data/anomalies.py    regime detection (rolling z, CUSUM, binary segmentation, Isolation Forest)
+backend/core/data/loaders.py      runtime loaders for alerts (NLP) and conflict events
+backend/core/pipeline.py          orchestrates raw -> validate -> silver -> features -> ML dataset
 ```
 
 - Raw events that fail the schema are dropped; genuine "anomalies" are **kept**
   and converted into the `regime_disrupted` feature rather than discarded.
-- `core/storage.py` is the storage layer: partitioned Parquet writes
+- `backend/core/storage.py` is the storage layer: partitioned Parquet writes
   (`year=`/`month=`), `_metadata.parquet` sidecars, predicate-pushed reads,
   plus a DuckDB query helper.
 
 ## 3. Feature engineering
 
-`core/features/node_features.py` builds **leakage-free** rolling/lag windows
+`backend/core/features/node_features.py` builds **leakage-free** rolling/lag windows
 across seven families:
 
 | Family | Example features |
@@ -68,35 +68,35 @@ across seven families:
 | Conflict | `conflict_risk_score`, trend, recency |
 | Regime | `regime_disrupted`, `regime_cusum`, `regime_iso`, `regime_roll_z`, `regime_days_adj` |
 
-`core/features/derived.py` adds the binary target `is_delayed`
+`backend/core/features/derived.py` adds the binary target `is_delayed`
 (`delay_hours > DELAY_THRESHOLD_HOURS`, default 24).
 
 ## 4. Modules (map)
 
 | Module | Responsibility |
 |---|---|
-| `core/config.py` | Central settings (`Settings` dataclass + `get_settings()` singleton, `.env` support) |
-| `core/logging_util.py` | JSON-lines structured logging |
-| `core/storage.py` | Partitioned Parquet + DuckDB storage layer |
-| `core/pipeline.py` | Raw → silver → ML dataset orchestration |
-| `core/train.py` | CLI for generate / train / evaluate |
-| `core/predictor.py` | `PredictionEngine` singleton powering the API |
-| `core/data/` | synthetic / validation / anomalies / loaders |
-| `core/features/` | node_features / derived |
-| `core/graph/` | topology (data-driven), network (cascade), gat (optional) |
-| `core/models/` | registry, classification (Stage A), delay (Stage B) |
-| `core/simulation/` | monte_carlo (Stage D) |
-| `core/routing/` | scenarios, comparison, recommendation |
-| `core/explain/` | shap_explainer (+ fallback) |
-| `core/evaluate/` | calibration curves, ECE, quantile coverage |
-| `core/nlp/` | rule-based alert event extractor |
-| `backend/` | FastAPI app (`main.py`, `api/routes.py`, `schemas/models.py`) |
+| `backend/core/config.py` | Central settings (`Settings` dataclass + `get_settings()` singleton, `.env` support) |
+| `backend/core/logging_util.py` | JSON-lines structured logging |
+| `backend/core/storage.py` | Partitioned Parquet + DuckDB storage layer |
+| `backend/core/pipeline.py` | Raw → silver → ML dataset orchestration |
+| `backend/core/train.py` | CLI for generate / train / evaluate |
+| `backend/core/predictor.py` | `PredictionEngine` singleton powering the API |
+| `backend/core/data/` | synthetic / validation / anomalies / loaders |
+| `backend/core/features/` | node_features / derived |
+| `backend/core/graph/` | topology (data-driven), network (cascade), gat (optional) |
+| `backend/core/models/` | registry, classification (Stage A), delay (Stage B) |
+| `backend/core/simulation/` | monte_carlo (Stage D) |
+| `backend/core/routing/` | scenarios, comparison, recommendation |
+| `backend/core/explain/` | shap_explainer (+ fallback) |
+| `backend/core/evaluate/` | calibration curves, ECE, quantile coverage |
+| `backend/core/nlp/` | rule-based alert event extractor |
+| `backend/app/` | FastAPI app (`main.py`, `api/routes.py`, `schemas/models.py`) |
 | `frontend/` | React 18 + Vite dashboard |
-| `api/` | Vercel serverless entrypoint (Mangum ASGI adapter) |
+| `backend/api/` | Vercel serverless entrypoint (Mangum ASGI adapter) |
 
 ## 5. Runtime engine
 
-`core/predictor.py` (`PredictionEngine`, a lazy singleton) is the brain behind
+`backend/core/predictor.py` (`PredictionEngine`, a lazy singleton) is the brain behind
 the API. For a route it:
 
 1. Loads the trained classifier, quantile regressors and feature metadata.
@@ -127,7 +127,7 @@ Reports, Data Sources, Settings`
 
 ## 7. Repository-layout notes
 
-- Routes are always data-driven through `core/graph/topology.py` — never
+- Routes are always data-driven through `backend/core/graph/topology.py` — never
   hardcoded in logic.
-- All thresholds live in `core/config.py`.
+- All thresholds live in `backend/core/config.py`.
 - Quantile models are enforced **monotone** (P50 ≤ P80 ≤ P90) at prediction time.

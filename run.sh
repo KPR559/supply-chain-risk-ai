@@ -7,9 +7,9 @@ echo "==> Installing python deps"
 pip install -r requirements.txt -q
 
 echo "==> Generating data + training + evaluating"
-python -m core.train --generate-only
-python -m core.train --train-only
-python -m core.train --eval-only
+python -m backend.core.train --generate-only
+python -m backend.core.train --train-only
+python -m backend.core.train --eval-only
 
 echo "==> Running tests"
 python -m pytest -q
@@ -20,7 +20,7 @@ if [ ! -d frontend/node_modules ]; then
 fi
 
 echo "==> Starting API on http://127.0.0.1:8000"
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 &
 API_PID=$!
 
 echo "==> Starting dashboard on http://127.0.0.1:5173"

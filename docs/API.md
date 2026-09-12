@@ -12,7 +12,7 @@ Interactive OpenAPI docs are served at `/docs`.
 
 ## Request models
 
-Defined in `backend/schemas/models.py`.
+Defined in `backend/app/schemas/models.py`.
 
 | Model | Fields (default) |
 |---|---|
@@ -139,5 +139,5 @@ Raw vs silver record counts and removal rate.
 
 Endpoints return plain dictionaries; the Pydantic response models
 (`GetShipmentResponse`, `ExplanationResponse`, `HealthResponse`) defined in
-`backend/schemas/models.py` are currently **unused** and are kept for reference.
+`backend/app/schemas/models.py` are currently **unused** and are kept for reference.
 ```
