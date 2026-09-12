@@ -59,6 +59,7 @@ def health() -> Dict[str, Any]:
         "models": registry.list_models(),
         "data": {
             "datasets": storage.list_datasets(),
+            "warehouse": storage.warehouse_tables(),
             "graph_backend": s.graph_backend,
             "nlp_engine": s.nlp_engine,
             "mc_simulations": s.mc_simulations,

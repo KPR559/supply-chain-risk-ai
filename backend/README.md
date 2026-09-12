@@ -34,6 +34,29 @@ Generated, git-ignored: `artifacts/` (trained models + metrics), `data/`
 (synthetic datasets), resolved from the repo root via
 `backend/core/config.py`.
 
+## Database (DuckDB)
+
+`data/warehouse.duckdb` (path overridable with `DUCKDB_PATH`) is the
+project database. Tables:
+
+| Table | Source |
+|---|---|
+| `raw_events` | `data/raw/events.parquet` |
+| `silver_cleaned_events` | `data/silver/cleaned_events.parquet` |
+| `gold_node_observations` | `data/gold/node_observations/` parts |
+| `raw_alerts` | `data/raw/alerts.parquet` |
+| `raw_conflict_events` | `data/raw/conflict_events.parquet` |
+
+Rebuild it any time (runs automatically after data generation):
+
+```bash
+python -c "from backend.core.storage import materialize_warehouse; print(materialize_warehouse())"
+```
+
+Query it with `read_table(name, where=..., columns=...)` — e.g.
+`read_table("gold_node_observations", where="node_id='suez'")`.
+`GET /api/v1/health` lists the live tables under `data.warehouse`.
+
 ## Run
 
 ```bash

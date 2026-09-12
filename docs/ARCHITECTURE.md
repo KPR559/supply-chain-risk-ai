@@ -49,9 +49,16 @@ backend/core/pipeline.py          orchestrates raw -> validate -> silver -> feat
 
 - Raw events that fail the schema are dropped; genuine "anomalies" are **kept**
   and converted into the `regime_disrupted` feature rather than discarded.
-- `backend/core/storage.py` is the storage layer: partitioned Parquet writes
-  (`year=`/`month=`), `_metadata.parquet` sidecars, predicate-pushed reads,
-  plus a DuckDB query helper.
+- `backend/core/storage.py` is the storage layer. Parquet files under
+  `data/<layer>/` are the raw material; the **DuckDB warehouse**
+  (`data/warehouse.duckdb`, overridable via `DUCKDB_PATH`) is the database the
+  runtime reads from, with tables `raw_events`, `silver_cleaned_events`,
+  `gold_node_observations`, `raw_alerts` and `raw_conflict_events`.
+  `materialize_warehouse()` rebuilds all tables from Parquet and runs
+  automatically at the end of data generation; `read_table()` queries with
+  optional SQL filters, falling back to Parquet only when the warehouse has
+  not been built yet. Partitioned writes keep `_metadata.parquet` sidecars
+  and predicate-pushed reads for the file path.
 
 ## 3. Feature engineering
 

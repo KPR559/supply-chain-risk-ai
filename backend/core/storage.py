@@ -1,17 +1,32 @@
 """Analytical storage layer built on Parquet + DuckDB.
 
-Provides reusable data-access functions for the raw / silver / gold layers and
-a small DuckDB query helper. Large analytical data is never blindly read into
-memory; DuckDB pushes down predicates.
+Parquet files under ``data/<layer>/`` are the raw material; the DuckDB
+warehouse (``data/warehouse.duckdb`` by default, see ``DUCKDB_PATH``) is the
+queryable database the runtime reads from. ``materialize_warehouse()``
+rebuilds all tables from Parquet and runs at the end of data generation.
+Large analytical data is never blindly read into memory; DuckDB pushes down
+predicates.
 """
 from __future__ import annotations
 
 import duckdb
 import pandas as pd
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Dict, Iterable, Optional
 
 from backend.core.config import get_settings
+from backend.core.logging_util import get_logger
+
+log = get_logger(__name__)
+
+# warehouse table -> (parquet layer, parquet dataset name)
+WAREHOUSE_SOURCES: Dict[str, tuple] = {
+    "raw_events": ("raw", "events.parquet"),
+    "silver_cleaned_events": ("silver", "cleaned_events.parquet"),
+    "gold_node_observations": ("gold", "node_observations"),
+    "raw_alerts": ("raw", "alerts.parquet"),
+    "raw_conflict_events": ("raw", "conflict_events.parquet"),
+}
 
 
 def ensure_storage_dirs() -> None:
@@ -147,3 +162,88 @@ def list_datasets() -> list:
                 if sub.is_dir():
                     result.append({"layer": layer, "name": sub.name})
     return result
+
+
+# ---------------------------------------------------------------------------
+# DuckDB warehouse (persistent database file, rebuilt from Parquet)
+# ---------------------------------------------------------------------------
+
+def warehouse_path() -> Path:
+    p = get_settings().abs_duckdb_path
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def connect(read_only: bool = False):
+    """Open a connection to the warehouse database file."""
+    return duckdb.connect(database=str(warehouse_path()), read_only=read_only)
+
+
+def warehouse_tables() -> list:
+    """Names of tables currently in the warehouse ([] if none built yet)."""
+    if not get_settings().abs_duckdb_path.exists():
+        return []
+    con = connect(read_only=True)
+    try:
+        return sorted(r[0] for r in con.execute("SHOW TABLES").fetchall())
+    finally:
+        con.close()
+
+
+def materialize_warehouse() -> Dict[str, int]:
+    """(Re)build every warehouse table from the Parquet layers.
+
+    Missing datasets are skipped so partial data still yields a usable DB.
+    Returns {table: row_count}.
+    """
+    s = get_settings()
+    counts: Dict[str, int] = {}
+    con = connect()
+    try:
+        for table, (layer, name) in WAREHOUSE_SOURCES.items():
+            base = s.abs_data_dir / layer / name
+            if base.is_dir():
+                files = sorted(
+                    str(f) for f in base.rglob("*.parquet")
+                    if f.name != "_metadata.parquet"
+                )
+            elif base.is_file():
+                files = [str(base)]
+            else:
+                continue
+            if not files:
+                continue
+            files_sql = "[" + ", ".join(
+                "'" + f.replace("'", "''") + "'" for f in files) + "]"
+            con.execute(
+                f"CREATE OR REPLACE TABLE {table} AS "
+                f"SELECT * FROM read_parquet({files_sql})"
+            )
+            counts[table] = con.execute(
+                f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    finally:
+        con.close()
+    log.info(f"Warehouse materialized: {warehouse_path()} tables={counts}")
+    return counts
+
+
+def read_table(name: str, where: Optional[str] = None,
+               columns: Optional[list] = None) -> pd.DataFrame:
+    """Read a warehouse table (optional SQL filter / column projection).
+
+    Raises FileNotFoundError when the warehouse or the table does not exist
+    yet — callers fall back to Parquet or ask for a data generate.
+    """
+    if name not in warehouse_tables():
+        raise FileNotFoundError(
+            f"Warehouse table not found: {name} "
+            f"({get_settings().abs_duckdb_path})")
+    cols = "*" if not columns else ", ".join(columns)
+    sql = f"SELECT {cols} FROM {name}"
+    if where:
+        sql += f" WHERE {where}"
+    con = connect(read_only=True)
+    try:
+        return con.execute(sql).df()
+    finally:
+        con.close()

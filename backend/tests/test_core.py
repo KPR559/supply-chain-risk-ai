@@ -95,6 +95,27 @@ def test_storage_write_read_roundtrip(tmp_path, monkeypatch):
     assert {"suez", "mumbai"} == set(out["node_id"])
 
 
+def test_warehouse_materialize_roundtrip(tmp_path, monkeypatch):
+    import pandas as pd
+    from backend.core import storage as st
+    from backend.core.config import PROJECT_ROOT
+    monkeypatch.setattr("backend.core.storage.get_settings",
+                        lambda: _fake_settings(PROJECT_ROOT, tmp_path))
+    raw = tmp_path / "raw"
+    raw.mkdir(parents=True)
+    pd.DataFrame({"node_id": ["suez", "mumbai"],
+                  "delay_hours": [30.0, 5.0]}).to_parquet(raw / "events.parquet", index=False)
+    assert st.warehouse_tables() == []
+    counts = st.materialize_warehouse()
+    assert counts["raw_events"] == 2
+    assert "raw_events" in st.warehouse_tables()
+    out = st.read_table("raw_events", where="delay_hours > 10")
+    assert len(out) == 1
+    assert out.iloc[0]["node_id"] == "suez"
+    with pytest.raises(FileNotFoundError):
+        st.read_table("no_such_table")
+
+
 def _fake_settings(root, data_dir):
     from dataclasses import replace
     s = get_settings()

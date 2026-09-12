@@ -78,6 +78,9 @@ class Settings:
     artifact_dir: Path = field(
         default_factory=lambda: Path(_env("ARTIFACT_DIR", "artifacts"))
     )
+    duckdb_path: Path = field(
+        default_factory=lambda: Path(_env("DUCKDB_PATH", "warehouse.duckdb"))
+    )
 
     mc_simulations: int = field(default_factory=lambda: _env_int("MC_SIMULATIONS", 10000))
     mc_seed: int = field(default_factory=lambda: _env_int("MC_SEED", 42))
@@ -129,6 +132,13 @@ class Settings:
     @property
     def abs_artifact_dir(self) -> Path:
         return self.absolute(self.artifact_dir)
+
+    @property
+    def abs_duckdb_path(self) -> Path:
+        p = self.duckdb_path
+        if p.is_absolute():
+            return p
+        return self.abs_data_dir / p
 
 
 _settings: Optional[Settings] = None

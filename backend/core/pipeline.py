@@ -23,7 +23,10 @@ FEATURE_GROUPS: List[str] = list(node_features.FEATURE_GROUPS.keys())
 
 
 def load_observations() -> pd.DataFrame:
-    return storage.read_partitioned("node_observations", layer="gold")
+    try:
+        return storage.read_table("gold_node_observations")
+    except FileNotFoundError:
+        return storage.read_partitioned("node_observations", layer="gold")
 
 
 def prepare_ml_dataset(groups: Optional[List[str]] = None) -> pd.DataFrame:
@@ -81,6 +84,7 @@ def clean_raw_events() -> pd.DataFrame:
     cleaned = validate_events(df)
     (s.abs_data_dir / "silver").mkdir(parents=True, exist_ok=True)
     cleaned.to_parquet(s.abs_data_dir / "silver" / "cleaned_events.parquet", index=False)
+    storage.materialize_warehouse()
     return cleaned
 
 

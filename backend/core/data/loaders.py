@@ -9,8 +9,20 @@ import pandas as pd
 from backend.core.config import get_settings
 from backend.core.storage import list_datasets
 
+_TABLE_BY_FILE = {
+    "alerts.parquet": "raw_alerts",
+    "conflict_events.parquet": "raw_conflict_events",
+}
+
 
 def _latest_raw(name: str) -> pd.DataFrame:
+    table = _TABLE_BY_FILE.get(name)
+    if table is not None:
+        try:
+            from backend.core.storage import read_table
+            return read_table(table)
+        except FileNotFoundError:
+            pass
     s = get_settings()
     p = s.abs_data_dir / "raw" / name
     if p.exists():
