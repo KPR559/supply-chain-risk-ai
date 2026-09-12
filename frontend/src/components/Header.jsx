@@ -8,8 +8,6 @@ export default function Header({
   lastUpdated,
   onRefresh,
   prediction,
-  user,
-  onLogout,
 }) {
   const list = shipments || [];
 
@@ -43,14 +41,6 @@ export default function Header({
             ↻
           </button>
         </div>
-        {user && (
-          <div className="user-chip" title={`Signed in as ${user}`}>
-            <span className="user-name">{user}</span>
-            <button className="btn ghost logout-btn" onClick={onLogout} title="Sign out">
-              Log out
-            </button>
-          </div>
-        )}
       </div>
     </header>
   );

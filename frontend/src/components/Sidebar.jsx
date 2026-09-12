@@ -11,7 +11,7 @@ export const NAV_ITEMS = [
   { id: "reports", label: "Reports", icon: "▥" },
 ];
 
-export default function Sidebar({ active = "overview", onSelect }) {
+export default function Sidebar({ active = "overview", onSelect, user, onLogout }) {
   return (
     <aside className="sidebar">
       <nav className="sidebar-nav">
@@ -29,11 +29,24 @@ export default function Sidebar({ active = "overview", onSelect }) {
           </button>
         ))}
       </nav>
-      <div className="sidebar-brand">
-        <div className="brand-logo">∞</div>
-        <div>
-          <div className="brand-name">LOGIX</div>
-          <div className="brand-sub">AI Supply Chain Suite</div>
+      <div className="sidebar-footer">
+        {user && (
+          <div className="sidebar-user" title={`Signed in as ${user}`}>
+            <span className="user-avatar">{user[0].toUpperCase()}</span>
+            <span className="user-name">{user}</span>
+          </div>
+        )}
+        {onLogout && (
+          <button className="btn ghost logout-btn-full" onClick={onLogout} title="Sign out">
+            ⏻ Log out
+          </button>
+        )}
+        <div className="sidebar-brand">
+          <div className="brand-logo">∞</div>
+          <div>
+            <div className="brand-name">LOGIX</div>
+            <div className="brand-sub">AI Supply Chain Suite</div>
+          </div>
         </div>
       </div>
     </aside>

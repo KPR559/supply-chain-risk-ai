@@ -179,7 +179,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar active={view} onSelect={setView} />
+      <Sidebar active={view} onSelect={setView} user={user} onLogout={handleLogout} />
       <div className="main-area">
         <Header
           shipments={shipments}
@@ -189,8 +189,6 @@ export default function App() {
           lastUpdated={lastUpdated}
           onRefresh={() => loadBase(route, nSim, selectedShipment?.requiredDate || null)}
           prediction={prediction}
-          user={user}
-          onLogout={handleLogout}
         />
 
         {error && <div className="banner error">API error: {error}</div>}

@@ -44,7 +44,10 @@ body {
 /* ── Sidebar ── */
 .sidebar {
   width: var(--sidebar-w);
-  min-height: 100vh;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
   display: flex;
@@ -86,13 +89,35 @@ body {
 
 .nav-icon { font-size: 14px; width: 18px; text-align: center; }
 
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 10px;
+}
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 4px;
+}
+.user-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #1565c0);
+  display: grid; place-items: center;
+  font-size: 13px; color: #fff; font-weight: 700;
+  flex-shrink: 0;
+}
+.logout-btn-full { width: 100%; }
+
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 14px 8px;
+  padding: 12px 4px 4px;
   border-top: 1px solid var(--border);
-  margin: 0 10px;
+  margin: 2px 0 0;
 }
 
 .brand-logo {
@@ -793,18 +818,7 @@ input[type="number"] { width: 90px; }
   color: var(--text);
 }
 
-/* Header user chip */
-.user-chip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 6px 6px 12px;
-  background: var(--panel2);
-}
 .user-name { font-size: 12px; color: var(--text); font-weight: 600; }
-.logout-btn { padding: 5px 10px; font-size: 11px; }
 
 /* Shipment registry */
 .ship-grid {
