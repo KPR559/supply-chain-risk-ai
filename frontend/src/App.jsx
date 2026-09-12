@@ -207,6 +207,24 @@ export default function App() {
     setView("results");
   };
 
+  const handleDeleteAccount = async () => {
+    if (!token) return "Not signed in.";
+    try {
+      await api.deleteAccount(token);
+    } catch (e) {
+      return e.message || "Delete failed. Is the API running?";
+    }
+    clearSession();
+    setUser(null);
+    setToken(null);
+    setPrediction(null);
+    setExplanation(null);
+    setCritical(null);
+    setError(null);
+    setView("results");
+    return null;
+  };
+
   // Re-validate any restored session against the backend on startup.
   useEffect(() => {
     const s = getSession();
@@ -262,7 +280,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar active={view} onSelect={setView} user={user} onLogout={handleLogout} />
+      <Sidebar active={view} onSelect={setView} user={user} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} />
       <div className="main-area">
         <MobileNav active={view} onSelect={setView} onLogout={handleLogout} />
         <Header

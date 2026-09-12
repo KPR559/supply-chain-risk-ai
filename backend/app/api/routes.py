@@ -11,7 +11,8 @@ from backend.app.schemas.models import (CompareRoutesRequest, LoginRequest, Pred
                                      WhatIfRequest)
 from backend.core import storage
 from backend.core.auth import (UsernameTakenError, authenticate, create_session,
-                               register_user, revoke_token, verify_token)
+                               delete_user, register_user, revoke_token,
+                               verify_token)
 from backend.core.config import get_settings
 from backend.core.graph import topology
 from backend.core.logging_util import get_logger, log_with
@@ -114,6 +115,15 @@ def me(request: Request) -> Dict[str, Any]:
     if username is None:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     return {"username": username}
+
+
+@router.delete("/account")
+def delete_account(request: Request) -> Dict[str, Any]:
+    username = verify_token(_bearer_token(request))
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    delete_user(username)
+    return {"status": "ok", "deleted": username}
 
 
 # ---------------------------------------------------------------------------

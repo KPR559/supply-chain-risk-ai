@@ -48,7 +48,10 @@ Sign-in is verified by the backend (`POST /api/v1/login`) against the DuckDB
 (12 h expiry) kept in the `sessions` table. The client stores only the token
 (`localStorage` when "Keep me signed in" is checked, `sessionStorage`
 otherwise) and re-validates it via `GET /api/v1/me` on startup; logout calls
-`POST /api/v1/logout` and clears it. The form has **Sign in** and
+`POST /api/v1/logout` and clears it. The sidebar footer also offers
+**Delete account** (two-step confirm, `DELETE /api/v1/account`), which removes
+the user and all sessions and returns to the sign-in screen.
+The form has **Sign in** and
 **Create account** tabs — registration (`POST /api/v1/register`) validates
 the username/password server-side and signs the new user straight in.
 Default credentials:

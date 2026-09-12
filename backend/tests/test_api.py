@@ -136,6 +136,24 @@ def test_me_no_token(isolated_auth):
     assert client.get("/api/v1/me", headers={"Authorization": "Bearer bogus"}).status_code == 401
 
 
+def test_delete_account_removes_user_and_sessions(isolated_auth):
+    token = client.post(
+        "/api/v1/register",
+        json={"username": "tempuser", "password": "s3cure-pass"}).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    r = client.delete("/api/v1/account", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["deleted"] == "tempuser"
+    assert client.get("/api/v1/me", headers=headers).status_code == 401
+    assert client.post(
+        "/api/v1/login",
+        json={"username": "tempuser", "password": "s3cure-pass"}).status_code == 401
+
+
+def test_delete_account_no_token(isolated_auth):
+    assert client.delete("/api/v1/account").status_code == 401
+
+
 def test_register_new_user_auto_login(isolated_auth):
     r = client.post("/api/v1/register",
                     json={"username": "operator1", "password": "s3cure-pass"})

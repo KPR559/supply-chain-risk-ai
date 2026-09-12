@@ -185,3 +185,20 @@ def revoke_token(token: Optional[str]) -> None:
         )
     finally:
         con.close()
+
+
+def delete_user(username: str) -> bool:
+    """Delete a user and all their sessions. Returns True when removed."""
+    _ensure_tables()
+    con = storage.connect()
+    try:
+        exists = con.execute(
+            "SELECT 1 FROM users WHERE username = ?", [username]
+        ).fetchone()
+        if exists is None:
+            return False
+        con.execute("DELETE FROM sessions WHERE username = ?", [username])
+        con.execute("DELETE FROM users WHERE username = ?", [username])
+        return True
+    finally:
+        con.close()

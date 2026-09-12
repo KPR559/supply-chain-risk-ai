@@ -64,6 +64,11 @@ Requires `Authorization: Bearer <token>`. Returns `{ "username" }`.
 Requires `Authorization: Bearer <token>` (also succeeds without one).
 Revokes the session token. Returns `{ "status": "ok" }`.
 
+### `DELETE /account`
+Requires `Authorization: Bearer <token>`. Permanently deletes the signed-in
+account and all its sessions. Returns `{ "status": "ok", "deleted": username }`.
+`401` without a valid token.
+
 ### `POST /register`
 Body: `{ "username", "password" }`. Creates a new account — username must be
 3–32 chars (`A-Z a-z 0-9 _ . -`), password minimum 8 chars (validated with

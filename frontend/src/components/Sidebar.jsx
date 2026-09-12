@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 export const NAV_ITEMS = [
   { id: "results", label: "Prediction Results", icon: "◉" },
@@ -14,7 +14,25 @@ export const NAV_ITEMS = [
   { id: "charts", label: "Charts & Graphs", icon: "▤" },
 ];
 
-export default function Sidebar({ active = "results", onSelect, user, onLogout }) {
+export default function Sidebar({ active = "results", onSelect, user, onLogout, onDeleteAccount }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [delError, setDelError] = useState(null);
+
+  const doDelete = async () => {
+    setBusy(true);
+    setDelError(null);
+    try {
+      const err = await onDeleteAccount();
+      if (err) {
+        setDelError(err);
+        setConfirming(false);
+      }
+      // on success App signs out, unmounting this sidebar
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
@@ -53,6 +71,43 @@ export default function Sidebar({ active = "results", onSelect, user, onLogout }
             ⏻ Log out
           </button>
         )}
+        {onDeleteAccount &&
+          (confirming ? (
+            <div className="delete-confirm">
+              <span>
+                Delete <b>{user}</b> forever?
+              </span>
+              <div className="delete-confirm-actions">
+                <button
+                  className="btn danger mini-btn"
+                  onClick={doDelete}
+                  disabled={busy}
+                  title="Permanently delete this account"
+                >
+                  {busy ? "Deleting…" : "Yes, delete"}
+                </button>
+                <button
+                  className="btn ghost mini-btn"
+                  onClick={() => {
+                    setConfirming(false);
+                    setDelError(null);
+                  }}
+                  disabled={busy}
+                >
+                  Keep
+                </button>
+              </div>
+              {delError && <em className="form-error">{delError}</em>}
+            </div>
+          ) : (
+            <button
+              className="delete-account-link"
+              onClick={() => setConfirming(true)}
+              title="Permanently delete this account"
+            >
+              Delete account
+            </button>
+          ))}
       </div>
     </aside>
   );

@@ -10,6 +10,16 @@ async function get(path, { token = null } = {}) {
   return res.json();
 }
 
+async function del(path, { token = null } = {}) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `${res.status}: ${path}`);
+  }
+  return res.json();
+}
+
 async function post(path, body, { token = null } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -31,6 +41,7 @@ export const api = {
   register: (username, password) => post("/register", { username, password }),
   me: (token) => get("/me", { token }),
   logout: (token) => post("/logout", {}, { token }),
+  deleteAccount: (token) => del("/account", { token }),
   demo: () => get("/demo"),
   predict: (route, { nSim = null, deadlineDate = null } = {}) =>
     post("/predict", {
