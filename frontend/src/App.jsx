@@ -64,12 +64,12 @@ export default function App() {
   }, []);
 
   const loadBase = useCallback(
-    async (routeId, simCount = nSim) => {
+    async (routeId, simCount = nSim, deadlineDate = null) => {
       setLoading(true);
       setError(null);
       try {
         const [pred, healthRes, dqRes] = await Promise.all([
-          api.predict(routeId, { nSim: simCount }),
+          api.predict(routeId, { nSim: simCount, deadlineDate }),
           api.health().catch(() => null),
           api.dataQuality().catch(() => null),
         ]);
@@ -104,7 +104,7 @@ export default function App() {
       setSelectedId(initial.id);
       saveSelectedId(initial.id);
       setRoute(initial.routeId);
-      loadBase(initial.routeId, nSim);
+      loadBase(initial.routeId, nSim, initial.requiredDate || null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loadRoutes]);
@@ -115,7 +115,7 @@ export default function App() {
     setSelectedId(found.id);
     saveSelectedId(found.id);
     setRoute(found.routeId);
-    loadBase(found.routeId, nSim);
+    loadBase(found.routeId, nSim, found.requiredDate || null);
   };
 
   const addShipment = (fields) => {
@@ -191,7 +191,7 @@ export default function App() {
           onSelectShipment={selectShipment}
           loading={loading}
           lastUpdated={lastUpdated}
-          onRefresh={() => loadBase(route, nSim)}
+          onRefresh={() => loadBase(route, nSim, selectedShipment?.requiredDate || null)}
           prediction={prediction}
           user={user}
           onLogout={handleLogout}
@@ -205,10 +205,10 @@ export default function App() {
             data={data}
             nSim={nSim}
             onNSimChange={setNSim}
-            onApply={() => loadBase(route, nSim)}
+            onApply={() => loadBase(route, nSim, selectedShipment?.requiredDate || null)}
             onReset={() => {
               setNSim(DEFAULT_NSIM);
-              loadBase(route, DEFAULT_NSIM);
+              loadBase(route, DEFAULT_NSIM, selectedShipment?.requiredDate || null);
             }}
           />
         ) : (

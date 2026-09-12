@@ -187,6 +187,18 @@ export default function ShipmentsView({ data }) {
                 <span>Expected arrival <b>{mc?.expected_days?.toFixed(1)} d</b></span>
                 <span>P90 <b>{mc?.percentiles?.p90?.toFixed(1)} d</b></span>
                 <span>Expected delay <b>{delayDaysFromHours(mc?.expected_delay_hours)}</b></span>
+                <span>
+                  Deadline miss risk{" "}
+                  <b>
+                    {mc?.deadline_date
+                      ? `${Math.round((mc?.p_miss_deadline ?? 0) * 100)}%`
+                      : "—"}
+                  </b>
+                </span>
+                <span>
+                  Required{" "}
+                  <b>{formatDate(mc?.deadline_date || selectedShipment.requiredDate)}</b>
+                </span>
                 <span>{mc?.n_simulations?.toLocaleString()} simulations</span>
               </div>
             </div>

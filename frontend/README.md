@@ -65,6 +65,14 @@ prediction). The header's Shipment ID dropdown switches between records;
 **+ Add shipment** creates a new one (ID must be unique), Delete removes it.
 Records persist in `localStorage` (`src/shipments.js`).
 
+## Deadline risk
+
+Each prediction sends the selected shipment's Required Delivery Date as
+`deadline_date`. The Overview shows a **Deadline Miss Risk** KPI card (share
+of Monte Carlo runs arriving after the required date), and the Shipments view
+repeats it next to the required date. Shipments without a required date show
+"—" / "No deadline set".
+
 Production build inlines `VITE_API_BASE=https://shipment-delay-dashboard.vercel.app/api/v1`
 (see `docs/DEPLOYMENT.md`).
 

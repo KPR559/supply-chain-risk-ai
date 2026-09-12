@@ -25,12 +25,13 @@ async function post(path, body) {
 export const api = {
   health: () => get("/health"),
   demo: () => get("/demo"),
-  predict: (route, { nSim = null } = {}) =>
+  predict: (route, { nSim = null, deadlineDate = null } = {}) =>
     post("/predict", {
       origin: "frankfurt",
       destination: "final_destination",
       route_id: route,
       ...(nSim ? { n_sim: nSim } : {}),
+      ...(deadlineDate ? { deadline_date: deadlineDate } : {}),
     }),
   whatif: (shipmentId, name, nodeId, adjustments) =>
     post("/what-if", { shipment_id: shipmentId, name, node_id: nodeId, adjustments }),

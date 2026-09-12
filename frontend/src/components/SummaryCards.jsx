@@ -40,6 +40,10 @@ export default function SummaryCards({ prediction }) {
   const delayDays = (mc.expected_delay_hours ?? 0) / 24;
   const resilience = computeResilienceScore(nodes, mc);
   const etaDate = mc.expected_eta_date ? formatDate(mc.expected_eta_date) : `${mc.expected_days?.toFixed(0)} d`;
+  const missRisk = mc.p_miss_deadline ?? 0;
+  const missPct = Math.round(missRisk * 100);
+  const hasDeadline = Boolean(mc.deadline_date);
+  const deadlineLabel = mc.deadline_date ? formatDate(mc.deadline_date) : null;
 
   const riskTrend = [58, 61, 64, 67, 69, 71, Math.round(maxRisk * 100)];
   const delayTrend = [3.2, 3.8, 4.5, 5.1, 5.6, 6.0, delayDays];
@@ -77,6 +81,14 @@ export default function SummaryCards({ prediction }) {
         sparkData={resTrend}
         sparkColor="#ffb300"
         variant={resilience >= 75 ? "low" : resilience >= 50 ? "med" : "high"}
+      />
+      <KpiCard
+        label="Deadline Miss Risk"
+        value={hasDeadline ? `${missPct}%` : "—"}
+        sub={hasDeadline ? `Required ${deadlineLabel}` : "No deadline set"}
+        sparkData={hasDeadline ? [8, 12, 11, 15, 18, 21, missPct] : null}
+        sparkColor="#ab47bc"
+        variant={hasDeadline ? riskClass(missRisk) : ""}
       />
       <KpiCard
         label="Total Shipments"
