@@ -18,8 +18,6 @@ import ShipmentsView from "./pages/ShipmentsView.jsx";
 import AlertsView from "./pages/AlertsView.jsx";
 import AnalyticsView from "./pages/AnalyticsView.jsx";
 import ReportsView from "./pages/ReportsView.jsx";
-import DataSourcesView from "./pages/DataSourcesView.jsx";
-import SettingsView from "./pages/SettingsView.jsx";
 
 const DEFAULT_ROUTE = "suez";
 const DEFAULT_NSIM = 10000;
@@ -33,8 +31,6 @@ const VIEWS = {
   alerts: AlertsView,
   analytics: AnalyticsView,
   reports: ReportsView,
-  sources: DataSourcesView,
-  settings: SettingsView,
 };
 
 export default function App() {
@@ -200,20 +196,7 @@ export default function App() {
         {error && <div className="banner error">API error: {error}</div>}
         {loading && !prediction && <div className="loading-bar" />}
 
-        {view === "settings" ? (
-          <SettingsView
-            data={data}
-            nSim={nSim}
-            onNSimChange={setNSim}
-            onApply={() => loadBase(route, nSim, selectedShipment?.requiredDate || null)}
-            onReset={() => {
-              setNSim(DEFAULT_NSIM);
-              loadBase(route, DEFAULT_NSIM, selectedShipment?.requiredDate || null);
-            }}
-          />
-        ) : (
-          <ViewComponent data={data} />
-        )}
+        <ViewComponent data={data} />
       </div>
     </div>
   );

@@ -9,8 +9,6 @@ export const NAV_ITEMS = [
   { id: "alerts", label: "Alerts", icon: "⚠" },
   { id: "analytics", label: "Analytics", icon: "▤" },
   { id: "reports", label: "Reports", icon: "▥" },
-  { id: "sources", label: "Data Sources", icon: "◫" },
-  { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
 export default function Sidebar({ active = "overview", onSelect }) {
