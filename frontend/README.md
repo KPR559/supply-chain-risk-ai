@@ -65,6 +65,14 @@ prediction). The header's Shipment ID dropdown switches between records;
 **+ Add shipment** creates a new one (ID must be unique), Delete removes it.
 Records persist in `localStorage` (`src/shipments.js`).
 
+## Tab states
+
+Every tab renders through a shared `TabState` component (`src/components/TabState.jsx`):
+spinner while the engine loads, an error banner with **Retry** when the API is
+unreachable, and a friendly empty notice when there is nothing to show yet.
+`App.jsx` passes `loading`, `apiError` and `onRetry` to all views via `data` —
+with the backend stopped, no tab ever shows a blank screen or crashes.
+
 ## Deadline risk
 
 Each prediction sends the selected shipment's Required Delivery Date as

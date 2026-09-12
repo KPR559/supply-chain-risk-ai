@@ -174,6 +174,9 @@ export default function App() {
     shipments,
     selectedId,
     selectedShipment,
+    loading,
+    apiError: error,
+    onRetry: () => loadBase(route, nSim, selectedShipment?.requiredDate || null),
     onSelectShipment: selectShipment,
     onAddShipment: addShipment,
     onDeleteShipment: deleteShipment,
@@ -197,7 +200,6 @@ export default function App() {
           prediction={prediction}
         />
 
-        {error && <div className="banner error">API error: {error}</div>}
         {loading && !prediction && <div className="loading-bar" />}
 
         <ViewComponent data={data} />

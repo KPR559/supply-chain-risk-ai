@@ -1,8 +1,9 @@
 import React from "react";
 import RouteMap from "../components/RouteMap.jsx";
+import TabState from "../components/TabState.jsx";
 
 export default function RouteMapView({ data }) {
-  const { prediction, routesMeta, selectedShipment } = data;
+  const { prediction, routesMeta, selectedShipment, loading, apiError, onRetry } = data;
   const route = prediction?.route_id;
   const meta = routesMeta.find((r) => r.route_id === route);
 
@@ -21,9 +22,20 @@ export default function RouteMapView({ data }) {
         </div>
       </div>
 
-      <section className="panel">
-        <RouteMap graph={route} nodes={prediction?.node_predictions} />
-      </section>
+      <TabState
+        loading={loading}
+        error={apiError}
+        onRetry={onRetry}
+        empty={!prediction}
+        emptyText="No route to draw yet — select a shipment to run the engine."
+        loadingText="Loading route map…"
+      />
+
+      {prediction && (
+        <section className="panel">
+          <RouteMap graph={route} nodes={prediction?.node_predictions} />
+        </section>
+      )}
     </div>
   );
 }

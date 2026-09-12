@@ -1,8 +1,9 @@
 import React from "react";
 import PercentileChart from "../components/PercentileChart.jsx";
+import TabState from "../components/TabState.jsx";
 
 export default function EtaDistributionView({ data }) {
-  const { prediction } = data;
+  const { prediction, loading, apiError, onRetry } = data;
   const mc = prediction?.monte_carlo;
 
   return (
@@ -18,23 +19,34 @@ export default function EtaDistributionView({ data }) {
         </div>
       </div>
 
-      <section className="panel">
-        <h2>Estimated Arrival Distribution</h2>
-        <PercentileChart mc={mc} />
-      </section>
+      <TabState
+        loading={loading}
+        error={apiError}
+        onRetry={onRetry}
+        empty={!mc}
+        emptyText="No simulation yet — select a shipment to run the engine."
+        loadingText="Running Monte Carlo simulation…"
+      />
 
       {mc && (
-        <section className="panel compact">
-          <h2>Percentiles (days)</h2>
-          <div className="shipment-detail">
-            <span>P10 <b>{mc.percentiles?.p10?.toFixed(1)}</b></span>
-            <span>P25 <b>{mc.percentiles?.p25?.toFixed(1)}</b></span>
-            <span>P50 <b>{mc.percentiles?.p50?.toFixed(1)}</b></span>
-            <span>P80 <b>{mc.percentiles?.p80?.toFixed(1)}</b></span>
-            <span>P90 <b>{mc.percentiles?.p90?.toFixed(1)}</b></span>
-            <span>P95 <b>{mc.percentiles?.p95?.toFixed(1)}</b></span>
-          </div>
-        </section>
+        <>
+          <section className="panel">
+            <h2>Estimated Arrival Distribution</h2>
+            <PercentileChart mc={mc} />
+          </section>
+
+          <section className="panel compact">
+            <h2>Percentiles (days)</h2>
+            <div className="shipment-detail">
+              <span>P10 <b>{mc.percentiles?.p10?.toFixed(1)}</b></span>
+              <span>P25 <b>{mc.percentiles?.p25?.toFixed(1)}</b></span>
+              <span>P50 <b>{mc.percentiles?.p50?.toFixed(1)}</b></span>
+              <span>P80 <b>{mc.percentiles?.p80?.toFixed(1)}</b></span>
+              <span>P90 <b>{mc.percentiles?.p90?.toFixed(1)}</b></span>
+              <span>P95 <b>{mc.percentiles?.p95?.toFixed(1)}</b></span>
+            </div>
+          </section>
+        </>
       )}
     </div>
   );

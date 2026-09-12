@@ -4,18 +4,24 @@ import { riskColor } from "../utils/helpers.js";
 
 export default function RouteMap({ graph: routeId, nodes }) {
   const [graph, setGraph] = useState(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!routeId) return;
     let alive = true;
+    setFailed(false);
     api
       .graph(routeId)
       .then((g) => alive && setGraph(g))
-      .catch(() => alive && setGraph(null));
+      .catch(() => alive && (setGraph(null), setFailed(true)));
     return () => {
       alive = false;
     };
   }, [routeId]);
+
+  if (failed && !graph?.nodes?.length) {
+    return <div className="placeholder">Route map unavailable — the map request failed.</div>;
+  }
 
   if (!graph?.nodes?.length) {
     return <div className="placeholder">Loading route map…</div>;

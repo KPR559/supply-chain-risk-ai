@@ -1,4 +1,5 @@
 import React from "react";
+import TabState from "../components/TabState.jsx";
 import { formatDate, riskClass } from "../utils/helpers.js";
 
 function daysBetween(a, b) {
@@ -9,7 +10,7 @@ function daysBetween(a, b) {
 }
 
 export default function DeadlineRiskView({ data }) {
-  const { prediction, selectedShipment } = data;
+  const { prediction, selectedShipment, loading, apiError, onRetry } = data;
   const mc = prediction?.monte_carlo;
   const miss = mc?.p_miss_deadline ?? 0;
   const pct = Math.round(miss * 100);
@@ -35,43 +36,55 @@ export default function DeadlineRiskView({ data }) {
         </div>
       </div>
 
-      <section className="panel">
-        <h2>Miss Probability</h2>
-        {deadline && mc?.deadline_date != null ? (
-          <div className="deadline-hero">
-            <div className={`deadline-pct ${verdict.cls}`}>{pct}%</div>
-            <div>
-              <div>
-                <span className={`risk-pill ${verdict.cls || riskClass(miss)}`}>{verdict.label}</span>
-              </div>
-              <p className="muted">
-                {pct}% of {mc.n_simulations?.toLocaleString()} simulated arrivals land after{" "}
-                <b>{formatDate(deadline)}</b>.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <p className="muted">
-            No required delivery date on this prediction. Set one on the shipment record to
-            enable deadline risk.
-          </p>
-        )}
-      </section>
+      <TabState
+        loading={loading}
+        error={apiError}
+        onRetry={onRetry}
+        empty={!prediction}
+        emptyText="No prediction yet — select a shipment to run the engine."
+        loadingText="Evaluating deadline risk…"
+      />
 
-      {deadline && (
-        <section className="panel compact">
-          <h2>Dates</h2>
-          <div className="shipment-detail">
-            <span>Required delivery <b>{formatDate(deadline)}</b></span>
-            <span>Expected ETA <b>{formatDate(expectedEta)}</b></span>
-            <span>P90 arrival <b>{formatDate(mc?.eta_date?.p90)}</b></span>
-            {buffer != null && (
-              <span>
-                Buffer <b>{buffer >= 0 ? `+${buffer} days` : `${buffer} days overdue`}</b>
-              </span>
+      {prediction && (
+        <>
+          <section className="panel">
+            <h2>Miss Probability</h2>
+            {deadline && mc?.deadline_date != null ? (
+              <div className="deadline-hero">
+                <div className={`deadline-pct ${verdict.cls}`}>{pct}%</div>
+                <div>
+                  <div>
+                    <span className={`risk-pill ${verdict.cls || riskClass(miss)}`}>{verdict.label}</span>
+                  </div>
+                  <p className="muted">
+                    {pct}% of {mc.n_simulations?.toLocaleString()} simulated arrivals land after{" "}
+                    <b>{formatDate(deadline)}</b>.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="muted">
+                No required delivery date on this prediction. Set one on the shipment record to
+                enable deadline risk.
+              </p>
             )}
-          </div>
-        </section>
+          </section>
+          {deadline && (
+            <section className="panel compact">
+              <h2>Dates</h2>
+              <div className="shipment-detail">
+                <span>Required delivery <b>{formatDate(deadline)}</b></span>
+                <span>Expected ETA <b>{formatDate(expectedEta)}</b></span>
+                <span>P90 arrival <b>{formatDate(mc?.eta_date?.p90)}</b></span>
+                {buffer != null && (
+                  <span>
+                    Buffer <b>{buffer >= 0 ? `+${buffer} days` : `${buffer} days overdue`}</b>
+                  </span>
+                )}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import RecentShipments from "../components/RecentShipments.jsx";
 import CheckpointCards from "../components/CheckpointCards.jsx";
 import AlertsPanel from "../components/AlertsPanel.jsx";
+import TabState from "../components/TabState.jsx";
 import {
   blankShipment,
   PRIORITIES,
@@ -134,6 +135,9 @@ export default function ShipmentsView({ data }) {
     onSelectShipment,
     onAddShipment,
     onDeleteShipment,
+    loading,
+    apiError,
+    onRetry,
   } = data;
   const [showForm, setShowForm] = useState(false);
   const mc = prediction?.monte_carlo;
@@ -166,7 +170,15 @@ export default function ShipmentsView({ data }) {
 
       <section className="panel">
         <h2>Current Shipment</h2>
-        {selectedShipment ? (
+        <TabState
+          loading={loading}
+          error={apiError}
+          onRetry={onRetry}
+          empty={!loading && !apiError && !selectedShipment}
+          emptyText="No shipments yet — add your first shipment above."
+          loadingText="Loading shipment prediction…"
+        />
+        {selectedShipment && !loading && !apiError && (
           <div className="shipment-card">
             <div className="shipment-card-main">
               <div className="shipment-idh">
@@ -207,8 +219,6 @@ export default function ShipmentsView({ data }) {
               <CheckpointCards nodes={nodes} />
             </div>
           </div>
-        ) : (
-          <p className="muted">No shipments yet — add your first shipment above.</p>
         )}
       </section>
 

@@ -2,9 +2,10 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
 import SummaryCards from "../components/SummaryCards.jsx";
 import MetricsPanel from "../components/MetricsPanel.jsx";
+import TabState from "../components/TabState.jsx";
 
 export default function PredictionResultsView({ data }) {
-  const { prediction, dq } = data;
+  const { prediction, dq, loading, apiError, onRetry } = data;
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState(null);
 
@@ -32,7 +33,16 @@ export default function PredictionResultsView({ data }) {
         </div>
       </div>
 
-      <SummaryCards prediction={prediction} />
+      <TabState
+        loading={loading}
+        error={apiError}
+        onRetry={onRetry}
+        empty={!prediction}
+        emptyText="No prediction yet — select a shipment to run the engine."
+        loadingText="Running prediction engine…"
+      />
+
+      {prediction && <SummaryCards prediction={prediction} />}
       {error && <div className="banner error">{error}</div>}
 
       <section className="panel">

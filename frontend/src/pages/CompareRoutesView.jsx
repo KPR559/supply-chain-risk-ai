@@ -1,8 +1,10 @@
 import React from "react";
 import ComparePanel from "../components/ComparePanel.jsx";
+import TabState from "../components/TabState.jsx";
 
 export default function CompareRoutesView({ data }) {
-  const { prediction } = data;
+  const { prediction, loading, apiError, onRetry } = data;
+  const ready = Boolean(prediction);
 
   return (
     <div className="view-stack">
@@ -13,10 +15,21 @@ export default function CompareRoutesView({ data }) {
         </div>
       </div>
 
-      <section className="panel">
-        <h2>Alternative Routes</h2>
-        <ComparePanel prediction={prediction} />
-      </section>
+      <TabState
+        loading={loading}
+        error={apiError}
+        onRetry={onRetry}
+        empty={!ready}
+        emptyText="Nothing to compare yet — select a shipment to run the engine."
+        loadingText="Loading comparison…"
+      />
+
+      {ready && (
+        <section className="panel">
+          <h2>Alternative Routes</h2>
+          <ComparePanel prediction={prediction} />
+        </section>
+      )}
     </div>
   );
 }
