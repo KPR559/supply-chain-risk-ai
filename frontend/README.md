@@ -41,20 +41,22 @@ npm run build    # production build -> dist/
 |---|---|---|
 | `VITE_API_BASE` | backend base URL (build-time) | `/api/v1` (dev proxy) |
 
-## Auth (demo)
+## Auth
 
-The dashboard opens with a login screen (`src/pages/LoginView.jsx`, logic in
-`src/auth.js`). Default credentials:
+Sign-in is verified by the backend (`POST /api/v1/login`) against the DuckDB
+`users` table — passwords are PBKDF2-hashed, sessions are opaque bearer tokens
+(12 h expiry) kept in the `sessions` table. The client stores only the token
+(`localStorage` when "Keep me signed in" is checked, `sessionStorage`
+otherwise) and re-validates it via `GET /api/v1/me` on startup; logout calls
+`POST /api/v1/logout` and clears it. Default credentials:
 
 | Field | Value |
 |---|---|
 | Username | `admin` |
 | Password | `admin123` |
 
-The session persists in `localStorage`; signing out (header → Log out) clears
-it. This is a **demo-grade UI gate, not real security** — credentials live in
-the client bundle, so for production replace `validate()` with a backend login
-endpoint and a proper token.
+Change them with `AUTH_USER` / `AUTH_PASS` in `.env` (seeded on first login).
+Existing data endpoints currently stay open — login gates the UI, not the API.
 
 ## Shipments registry
 

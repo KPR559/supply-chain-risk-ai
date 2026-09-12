@@ -4,12 +4,14 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from backend.app.schemas.models import (CompareRoutesRequest, PredictRequest,
+from backend.app.schemas.models import (CompareRoutesRequest, LoginRequest, PredictRequest,
                                     ScenarioAdjustment, SimulateRequest,
                                     WhatIfRequest)
 from backend.core import storage
+from backend.core.auth import (authenticate, create_session, revoke_token,
+                               verify_token)
 from backend.core.config import get_settings
 from backend.core.graph import topology
 from backend.core.logging_util import get_logger, log_with
@@ -65,6 +67,42 @@ def health() -> Dict[str, Any]:
             "mc_simulations": s.mc_simulations,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Auth (DuckDB-backed users + token sessions)
+# ---------------------------------------------------------------------------
+
+def _bearer_token(request: Request) -> Optional[str]:
+    auth = request.headers.get("authorization", "")
+    scheme, _, token = auth.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token
+
+
+@router.post("/login")
+def login(req: LoginRequest) -> Dict[str, Any]:
+    username = authenticate(req.username.strip(), req.password)
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token, expires_at = create_session(username)
+    return {"token": token, "username": username,
+            "expires_at": expires_at.isoformat()}
+
+
+@router.post("/logout")
+def logout(request: Request) -> Dict[str, Any]:
+    revoke_token(_bearer_token(request))
+    return {"status": "ok"}
+
+
+@router.get("/me")
+def me(request: Request) -> Dict[str, Any]:
+    username = verify_token(_bearer_token(request))
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    return {"username": username}
 
 
 # ---------------------------------------------------------------------------

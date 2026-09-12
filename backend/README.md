@@ -21,7 +21,7 @@ Everything Python lives under `backend/` as importable packages
 | Path | Purpose |
 |---|---|
 | `backend/app/` | FastAPI app: `main.py` (app + CORS + `/api/v1` router mount), `api/routes.py` (17 endpoints), `schemas/models.py` (request models) |
-| `backend/core/` | ML engine: `config.py`, `pipeline.py`, `storage.py`, `predictor.py` (PredictionEngine singleton), `train.py` (CLI), `data/` (synthetic/validation/anomalies/loaders), `features/`, `graph/` (topology/network/optional GAT), `models/` (registry/classification/delay), `simulation/` (Monte Carlo), `routing/`, `explain/`, `evaluate/`, `nlp/` |
+| `backend/core/` | ML engine: `config.py`, `pipeline.py`, `storage.py`, `predictor.py` (PredictionEngine singleton), `train.py` (CLI), `auth.py` (DuckDB users + token sessions), `data/` (synthetic/validation/anomalies/loaders), `features/`, `graph/` (topology/network/optional GAT), `models/` (registry/classification/delay), `simulation/` (Monte Carlo), `routing/`, `explain/`, `evaluate/`, `nlp/` |
 | `backend/api/` | Vercel serverless entrypoint: `index.py` (Mangum adapter + sklearn `_loss` pickle-alias workaround) |
 | `backend/tests/` | `test_api.py` (HTTP), `test_core.py` (units), `test_engine.py` (slow E2E) |
 | `backend/requirements.txt` | lean production runtime (sklearn-only, pinned) |
@@ -56,6 +56,14 @@ python -c "from backend.core.storage import materialize_warehouse; print(materia
 Query it with `read_table(name, where=..., columns=...)` — e.g.
 `read_table("gold_node_observations", where="node_id='suez'")`.
 `GET /api/v1/health` lists the live tables under `data.warehouse`.
+
+## Auth
+
+`POST /api/v1/login` verifies credentials against the `users` table
+(PBKDF2-HMAC-SHA256, 600k iterations, stdlib-only) and issues a 12 h opaque
+bearer token stored hashed in `sessions`. `GET /api/v1/me` validates,
+`POST /api/v1/logout` revokes. Default `admin` / `admin123` comes from
+`AUTH_USER` / `AUTH_PASS` and is seeded on first login.
 
 ## Run
 

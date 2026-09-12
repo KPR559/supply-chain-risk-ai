@@ -49,6 +49,21 @@ Single route detail including edges (`mode`, `distance`, `reliability`).
 Runs and stores the demo prediction (Frankfurt → Final Destination via Suez) as
 both `frankfurt-final_destination` and the shortcut `FRA-IN-001`.
 
+### `POST /login`
+Body: `{ "username", "password" }`. Verifies credentials against the DuckDB
+`users` table (PBKDF2-hashed passwords; default `admin` seeded from
+`AUTH_USER` / `AUTH_PASS` on first use). Returns
+`{ "token", "username", "expires_at" }` — a 12 h opaque bearer token.
+`401` on bad credentials.
+
+### `GET /me`
+Requires `Authorization: Bearer <token>`. Returns `{ "username" }`.
+`401` when the token is missing, unknown or expired.
+
+### `POST /logout`
+Requires `Authorization: Bearer <token>` (also succeeds without one).
+Revokes the session token. Returns `{ "status": "ok" }`.
+
 ### `POST /predict`
 Body: `PredictRequest`. Returns the full prediction payload:
 

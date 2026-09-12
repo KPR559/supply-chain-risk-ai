@@ -84,3 +84,53 @@ def test_explanation_unknown_shipment_404():
 
 def test_unknown_node_404():
     assert client.get("/api/v1/node/nope/risk").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Auth (isolated tmp warehouse so the real one is never touched)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def isolated_auth(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from backend.core.config import get_settings as real_settings
+    fake = replace(real_settings(), project_root=tmp_path, data_dir=tmp_path)
+    monkeypatch.setattr("backend.app.api.routes.get_settings", lambda: fake)
+    monkeypatch.setattr("backend.core.storage.get_settings", lambda: fake)
+    return fake
+
+
+def test_login_default_admin(isolated_auth):
+    r = client.post("/api/v1/login", json={"username": "admin", "password": "admin123"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["username"] == "admin"
+    assert body["token"]
+    assert body["expires_at"]
+
+
+def test_login_wrong_password(isolated_auth):
+    client.post("/api/v1/login", json={"username": "admin", "password": "admin123"})
+    r = client.post("/api/v1/login", json={"username": "admin", "password": "nope"})
+    assert r.status_code == 401
+
+
+def test_login_unknown_user(isolated_auth):
+    r = client.post("/api/v1/login", json={"username": "ghost", "password": "whatever"})
+    assert r.status_code == 401
+
+
+def test_me_and_logout_flow(isolated_auth):
+    token = client.post(
+        "/api/v1/login", json={"username": "admin", "password": "admin123"}).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    r = client.get("/api/v1/me", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["username"] == "admin"
+    assert client.post("/api/v1/logout", headers=headers).status_code == 200
+    assert client.get("/api/v1/me", headers=headers).status_code == 401
+
+
+def test_me_no_token(isolated_auth):
+    assert client.get("/api/v1/me").status_code == 401
+    assert client.get("/api/v1/me", headers={"Authorization": "Bearer bogus"}).status_code == 401

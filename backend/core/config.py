@@ -104,6 +104,9 @@ class Settings:
 
     demo_seed: int = field(default_factory=lambda: _env_int("DEMO_SEED", 7))
 
+    auth_user: str = field(default_factory=lambda: _env("AUTH_USER", "admin"))
+    auth_pass: str = field(default_factory=lambda: _env("AUTH_PASS", "admin123"))
+
     api_host: str = field(default_factory=lambda: _env("API_HOST", "0.0.0.0"))
     api_port: int = field(default_factory=lambda: _env_int("API_PORT", 8000))
 

@@ -42,6 +42,11 @@ class CompareRoutesRequest(BaseModel):
     objectives: List[Literal["fastest", "lowest_risk", "lowest_uncertainty", "balanced"]] = ["fastest", "lowest_risk", "balanced"]
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 class GetShipmentResponse(BaseModel):
     shipment_id: str
     origin: str

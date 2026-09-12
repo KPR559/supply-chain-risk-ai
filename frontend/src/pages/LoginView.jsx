@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { DEFAULT_CREDENTIALS, validate } from "../auth.js";
+import { DEFAULT_CREDENTIALS } from "../auth.js";
 
 const HIGHLIGHTS = [
   {
@@ -29,15 +29,18 @@ export default function LoginView({ onLogin }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (validate(username, password)) {
-      setError(null);
-      onLogin(username.trim(), remember);
-    } else {
-      setError("Invalid username or password. Try the demo credentials below.");
+    setBusy(true);
+    setError(null);
+    try {
+      const err = await onLogin(username.trim(), password, remember);
+      if (err) setError(err);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -56,10 +59,6 @@ export default function LoginView({ onLogin }) {
           <h1 className="login-hero">
             Predictive risk &amp; decision intelligence for global supply chains
           </h1>
-          <p className="login-hero-sub">
-            Frankfurt → India freight corridor · delay risk, probabilistic ETA
-            and counterfactual planning in one dashboard.
-          </p>
 
           <ul className="login-points">
             {HIGHLIGHTS.map((h) => (
@@ -84,8 +83,7 @@ export default function LoginView({ onLogin }) {
       <main className="login-main">
         <form className="login-card" onSubmit={submit}>
           <div className="login-brand">LOGIX</div>
-          <h2 className="login-title">Welcome back</h2>
-          <p className="login-sub">Sign in to open the resilience dashboard</p>
+          <h2 className="login-title">Sign in</h2>
 
           {error && <div className="banner error login-error">{error}</div>}
 
@@ -132,19 +130,10 @@ export default function LoginView({ onLogin }) {
             <span>Keep me signed in</span>
           </label>
 
-          <button className="btn login-btn" type="submit">
-            Sign in →
+          <button className="btn login-btn" type="submit" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in →"}
           </button>
 
-          <div className="login-hint-box">
-            <div className="login-hint-title">Demo credentials</div>
-            <div className="login-hint">
-              username <code>{DEFAULT_CREDENTIALS.username}</code>
-              {" · "}password <code>{DEFAULT_CREDENTIALS.password}</code>
-            </div>
-          </div>
-
-          <p className="login-foot">LOGIX v1.0 · prototype — demo-grade sign-in, not real security</p>
         </form>
       </main>
     </div>

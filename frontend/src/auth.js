@@ -1,9 +1,8 @@
-// Demo-grade auth gate for the dashboard.
-//
-// The default credentials below are intentionally simple so reviewers can
-// sign in without setup. This is NOT real security (no backend session, no
-// hashing) — it only gates the UI. For production, replace `validate()`
-// with a call to a backend login endpoint and store a proper token.
+// Session handling for the dashboard.
+// Credentials are verified by the backend (POST /api/v1/login) against the
+// DuckDB users table (PBKDF2-hashed passwords). The client only keeps the
+// opaque session token — never any password. A stored session is valid only
+// if it carries a token (old client-side sessions are ignored).
 
 export const DEFAULT_CREDENTIALS = {
   username: "admin",
@@ -28,7 +27,7 @@ function readStore(store) {
     const raw = store.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && parsed.username === DEFAULT_CREDENTIALS.username) {
+    if (parsed && parsed.username && parsed.token) {
       return parsed;
     }
     return null;
@@ -55,13 +54,6 @@ function dropStore(store) {
   }
 }
 
-export function validate(username, password) {
-  return (
-    username.trim() === DEFAULT_CREDENTIALS.username &&
-    password === DEFAULT_CREDENTIALS.password
-  );
-}
-
 export function getSession() {
   return (
     readStore(storeOf("localStorage")) ||
@@ -69,8 +61,12 @@ export function getSession() {
   );
 }
 
-export function saveSession(username, remember = true) {
-  const payload = JSON.stringify({ username, at: new Date().toISOString() });
+export function saveSession(username, token, remember = true) {
+  const payload = JSON.stringify({
+    username,
+    token,
+    at: new Date().toISOString(),
+  });
   if (remember) {
     dropStore(storeOf("sessionStorage"));
     writeStore(storeOf("localStorage"), payload);

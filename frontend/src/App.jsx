@@ -42,6 +42,7 @@ const VIEWS = {
 
 export default function App() {
   const [user, setUser] = useState(() => getSession()?.username || null);
+  const [token, setToken] = useState(() => getSession()?.token || null);
   const [view, setView] = useState("results");
   const [route, setRoute] = useState(DEFAULT_ROUTE);
   const [shipments, setShipments] = useState(() => loadShipments());
@@ -161,20 +162,63 @@ export default function App() {
   const selectedShipment =
     shipments.find((s) => s.id === selectedId) || shipments[0] || null;
 
-  const handleLogin = (username, remember) => {
-    saveSession(username, remember);
-    setUser(username);
+  const handleLogin = async (username, password, remember) => {
+    try {
+      const res = await api.login(username, password);
+      saveSession(res.username || username, res.token, remember);
+      setUser(res.username || username);
+      setToken(res.token);
+      return null;
+    } catch (e) {
+      return e.message || "Sign-in failed. Is the API running?";
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (token) {
+      try {
+        await api.logout(token);
+      } catch {
+        // best effort — session is cleared locally regardless
+      }
+    }
     clearSession();
     setUser(null);
+    setToken(null);
     setPrediction(null);
     setExplanation(null);
     setCritical(null);
     setError(null);
     setView("results");
   };
+
+  // Re-validate any restored session against the backend on startup.
+  useEffect(() => {
+    const s = getSession();
+    if (!s?.token) {
+      clearSession();
+      setUser(null);
+      setToken(null);
+      return;
+    }
+    let alive = true;
+    api
+      .me(s.token)
+      .then((me) => {
+        if (!alive) return;
+        setUser(me.username || s.username);
+        setToken(s.token);
+      })
+      .catch(() => {
+        if (!alive) return;
+        clearSession();
+        setUser(null);
+        setToken(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const ViewComponent = VIEWS[view] || PredictionResultsView;
   const data = {

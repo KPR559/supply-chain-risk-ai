@@ -1,7 +1,8 @@
 const BASE = (import.meta.env.VITE_API_BASE || "/api/v1").replace(/\/$/, "");
 
-async function get(path) {
-  const res = await fetch(`${BASE}${path}`);
+async function get(path, { token = null } = {}) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${BASE}${path}`, { headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || `${res.status}: ${path}`);
@@ -9,10 +10,12 @@ async function get(path) {
   return res.json();
 }
 
-async function post(path, body) {
+async function post(path, body, { token = null } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -24,6 +27,9 @@ async function post(path, body) {
 
 export const api = {
   health: () => get("/health"),
+  login: (username, password) => post("/login", { username, password }),
+  me: (token) => get("/me", { token }),
+  logout: (token) => post("/logout", {}, { token }),
   demo: () => get("/demo"),
   predict: (route, { nSim = null, deadlineDate = null } = {}) =>
     post("/predict", {
