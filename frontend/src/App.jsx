@@ -161,8 +161,8 @@ export default function App() {
   const selectedShipment =
     shipments.find((s) => s.id === selectedId) || shipments[0] || null;
 
-  const handleLogin = (username) => {
-    saveSession(username);
+  const handleLogin = (username, remember) => {
+    saveSession(username, remember);
     setUser(username);
   };
 
