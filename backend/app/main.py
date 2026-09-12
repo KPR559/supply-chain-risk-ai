@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.routes import router
+from backend.core.auth import ensure_tables
 from backend.core.config import get_settings
 from backend.core.logging_util import get_logger
 
@@ -19,6 +20,10 @@ log = get_logger("backend.app.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("backend starting")
+    try:
+        ensure_tables()
+    except Exception as e:  # pragma: no cover - startup must never crash on this
+        log.warning(f"auth tables not ensured at startup: {e}")
     yield
     log.info("backend stopped")
 

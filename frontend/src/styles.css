@@ -127,17 +127,22 @@ body {
 }
 .logout-btn-full { width: 100%; }
 .delete-account-link {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: rgba(244, 67, 54, 0.06);
+  border: 1px solid rgba(244, 67, 54, 0.25);
+  color: var(--red);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
   font-family: var(--sans);
   cursor: pointer;
-  padding: 2px 4px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-align: left;
 }
-.delete-account-link:hover { color: var(--red); }
+.delete-account-link:hover { background: rgba(244, 67, 54, 0.12); }
 .delete-confirm {
   display: flex;
   flex-direction: column;

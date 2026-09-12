@@ -226,6 +226,8 @@ export default function App() {
   };
 
   // Re-validate any restored session against the backend on startup.
+  // Only a 401 (unknown/expired token) signs out; network or server errors
+  // keep the session so a backend blip never kicks the user to login.
   useEffect(() => {
     const s = getSession();
     if (!s?.token) {
@@ -242,11 +244,13 @@ export default function App() {
         setUser(me.username || s.username);
         setToken(s.token);
       })
-      .catch(() => {
+      .catch((e) => {
         if (!alive) return;
-        clearSession();
-        setUser(null);
-        setToken(null);
+        if (e && e.status === 401) {
+          clearSession();
+          setUser(null);
+          setToken(null);
+        }
       });
     return () => {
       alive = false;

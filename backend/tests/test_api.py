@@ -154,6 +154,22 @@ def test_delete_account_no_token(isolated_auth):
     assert client.delete("/api/v1/account").status_code == 401
 
 
+def test_verify_token_missing_db_returns_none(isolated_auth):
+    from backend.core import auth as auth_mod
+    # isolated warehouse file does not exist yet: must resolve to None,
+    # never raise (this is what kept kicking users to login on refresh)
+    assert auth_mod.verify_token("bogus") is None
+    auth_mod.revoke_token("bogus")  # must not raise either
+
+
+def test_expired_token_rejected(isolated_auth):
+    from backend.core import auth as auth_mod
+    auth_mod.ensure_tables()
+    token, _ = auth_mod.create_session("admin", ttl_hours=-1)
+    r = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+
 def test_register_new_user_auto_login(isolated_auth):
     r = client.post("/api/v1/register",
                     json={"username": "operator1", "password": "s3cure-pass"})

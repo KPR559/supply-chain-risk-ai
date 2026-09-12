@@ -105,7 +105,8 @@ export default function Sidebar({ active = "results", onSelect, user, onLogout, 
               onClick={() => setConfirming(true)}
               title="Permanently delete this account"
             >
-              Delete account
+              <span className="nav-icon">🗑</span>
+              <span>Delete account</span>
             </button>
           ))}
       </div>

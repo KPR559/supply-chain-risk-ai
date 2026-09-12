@@ -46,7 +46,10 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
-def _ensure_tables() -> None:
+def ensure_tables() -> None:
+    """Create users/sessions tables if missing. Called once at app startup;
+    write paths below also call it so ad-hoc use never hits a missing table.
+    """
     con = storage.connect()
     try:
         con.execute(
@@ -68,7 +71,7 @@ def _ensure_tables() -> None:
 def ensure_default_admin() -> str:
     """Create the default admin user if missing. Returns the username."""
     s = get_settings()
-    _ensure_tables()
+    ensure_tables()
     con = storage.connect()
     try:
         row = con.execute(
@@ -112,7 +115,7 @@ def register_user(username: str, password: str) -> str:
     Raises UsernameTakenError when the name is already registered.
     """
     username = username.strip()
-    _ensure_tables()
+    ensure_tables()
     con = storage.connect()
     try:
         exists = con.execute(
@@ -139,6 +142,7 @@ def create_session(username: str,
                    ttl_hours: int = _SESSION_TTL_HOURS) -> Tuple[str, datetime]:
     token = secrets.token_urlsafe(32)
     expires_at = _utcnow() + timedelta(hours=ttl_hours)
+    ensure_tables()
     con = storage.connect()
     try:
         con.execute(
@@ -152,18 +156,25 @@ def create_session(username: str,
 
 
 def verify_token(token: Optional[str]) -> Optional[str]:
-    """Return the username for a live session token, else None."""
+    """Return the username for a live session token, else None.
+
+    Hot path (every session check): no DDL here — tables are ensured at app
+    startup. Any database error resolves to None (unknown session), never an
+    exception, so transient DB hiccups can't crash requests.
+    """
     if not token:
         return None
-    _ensure_tables()
-    con = storage.connect()
     try:
-        row = con.execute(
-            "SELECT username, expires_at FROM sessions WHERE token_hash = ?",
-            [_token_hash(token)],
-        ).fetchone()
-    finally:
-        con.close()
+        con = storage.connect()
+        try:
+            row = con.execute(
+                "SELECT username, expires_at FROM sessions WHERE token_hash = ?",
+                [_token_hash(token)],
+            ).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        return None
     if row is None:
         return None
     username, expires_at = row
@@ -176,20 +187,22 @@ def verify_token(token: Optional[str]) -> Optional[str]:
 def revoke_token(token: Optional[str]) -> None:
     if not token:
         return
-    _ensure_tables()
-    con = storage.connect()
     try:
-        con.execute(
-            "DELETE FROM sessions WHERE token_hash = ?",
-            [_token_hash(token)],
-        )
-    finally:
-        con.close()
+        con = storage.connect()
+        try:
+            con.execute(
+                "DELETE FROM sessions WHERE token_hash = ?",
+                [_token_hash(token)],
+            )
+        finally:
+            con.close()
+    except Exception:
+        pass
 
 
 def delete_user(username: str) -> bool:
     """Delete a user and all their sessions. Returns True when removed."""
-    _ensure_tables()
+    ensure_tables()
     con = storage.connect()
     try:
         exists = con.execute(

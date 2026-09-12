@@ -1,21 +1,41 @@
 const BASE = (import.meta.env.VITE_API_BASE || "/api/v1").replace(/\/$/, "");
 
+function httpError(status, path, body) {
+  const err = new Error(body?.detail || `${status}: ${path}`);
+  err.status = status;
+  return err;
+}
+
 async function get(path, { token = null } = {}) {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`${BASE}${path}`, { headers });
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { headers });
+  } catch (e) {
+    const err = new Error(`Network error: ${path}`);
+    err.status = 0;
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `${res.status}: ${path}`);
+    throw httpError(res.status, path, body);
   }
   return res.json();
 }
 
 async function del(path, { token = null } = {}) {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { method: "DELETE", headers });
+  } catch (e) {
+    const err = new Error(`Network error: ${path}`);
+    err.status = 0;
+    throw err;
+  }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `${res.status}: ${path}`);
+    const errBody = await res.json().catch(() => ({}));
+    throw httpError(res.status, path, errBody);
   }
   return res.json();
 }
@@ -23,14 +43,21 @@ async function del(path, { token = null } = {}) {
 async function post(path, body, { token = null } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    const err = new Error(`Network error: ${path}`);
+    err.status = 0;
+    throw err;
+  }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `${res.status}: ${path}`);
+    const errBody = await res.json().catch(() => ({}));
+    throw httpError(res.status, path, errBody);
   }
   return res.json();
 }
