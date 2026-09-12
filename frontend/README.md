@@ -20,6 +20,8 @@ Live: <https://shipment-delay-frontend.vercel.app>
 | `src/main.jsx` | React root |
 | `src/App.jsx` | shell: view switcher, route/shipment selection, global state |
 | `src/api.js` | API client over `/api/v1` (base from `VITE_API_BASE`) |
+| `src/auth.js` | demo login gate (default creds + localStorage session) |
+| `src/shipments.js` | shipment registry store (seed records + localStorage) |
 | `src/pages/` | 10 views: Overview, Route Map, Risk Radar, Simulator, Shipments, Alerts, Analytics, Reports, Data Sources, Settings |
 | `src/components/` | 17 reusable components (RouteMap, PercentileChart, WhatIfPanel, Explanation, …) |
 | `src/utils/helpers.js` | risk thresholds/colors, formatting, resilience score |
@@ -53,6 +55,15 @@ The session persists in `localStorage`; signing out (header → Log out) clears
 it. This is a **demo-grade UI gate, not real security** — credentials live in
 the client bundle, so for production replace `validate()` with a backend login
 endpoint and a proper token.
+
+## Shipments registry
+
+The Shipments view keeps one independent record per shipment (ID, origin,
+destination, type, transport mode, departure / expected-arrival / required
+dates, priority, current location, status, plus the corridor route used for
+prediction). The header's Shipment ID dropdown switches between records;
+**+ Add shipment** creates a new one (ID must be unique), Delete removes it.
+Records persist in `localStorage` (`src/shipments.js`).
 
 Production build inlines `VITE_API_BASE=https://shipment-delay-dashboard.vercel.app/api/v1`
 (see `docs/DEPLOYMENT.md`).

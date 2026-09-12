@@ -1,9 +1,9 @@
 import React from "react";
 
 export default function Header({
-  route,
-  routesMeta,
-  onRouteChange,
+  shipments,
+  selectedId,
+  onSelectShipment,
   loading,
   lastUpdated,
   onRefresh,
@@ -11,9 +11,7 @@ export default function Header({
   user,
   onLogout,
 }) {
-  const shipmentId = prediction?.shipment_id
-    ? prediction.shipment_id.replace("frankfurt-final_destination", "FRK-IND-9281").toUpperCase()
-    : "FRK-IND-9281";
+  const list = shipments || [];
 
   return (
     <header className="page-header">
@@ -26,10 +24,14 @@ export default function Header({
       <div className="header-controls">
         <label className="shipment-select">
           <span>Shipment ID</span>
-          <select value={route} onChange={(e) => onRouteChange(e.target.value)} disabled={loading}>
-            {routesMeta.map((r) => (
-              <option key={r.route_id} value={r.route_id}>
-                {shipmentId} · {r.name}
+          <select
+            value={selectedId || ""}
+            onChange={(e) => onSelectShipment(e.target.value)}
+            disabled={loading || list.length === 0}
+          >
+            {list.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.id} · {s.origin} → {s.destination}
               </option>
             ))}
           </select>

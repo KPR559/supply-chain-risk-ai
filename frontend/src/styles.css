@@ -805,3 +805,37 @@ input[type="number"] { width: 90px; }
 }
 .user-name { font-size: 12px; color: var(--text); font-weight: 600; }
 .logout-btn { padding: 5px 10px; font-size: 11px; }
+
+/* Shipment registry */
+.ship-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 20px;
+  margin: 12px 0;
+  padding: 0;
+}
+.ship-row { display: flex; flex-direction: column; gap: 2px; }
+.ship-row dt { font-size: 11px; color: var(--muted); }
+.ship-row dd { margin: 0; font-size: 12.5px; color: var(--text); }
+.ship-form { margin-bottom: 4px; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.form-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.form-field input, .form-field select { width: 100%; }
+.form-error { color: var(--red); font-style: normal; font-size: 11px; }
+.form-actions { display: flex; gap: 10px; margin-top: 14px; }
+.table-actions { white-space: nowrap; text-align: right; }
+.table-actions .btn + .btn { margin-left: 8px; }
+.mini-btn { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+.btn.danger {
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+.btn.danger:hover { background: rgba(244, 67, 54, 0.1); }
+.clickable-row { cursor: pointer; }
+.clickable-row:hover td { background: rgba(76, 194, 255, 0.05); }

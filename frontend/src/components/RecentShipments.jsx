@@ -1,27 +1,27 @@
 import React from "react";
-import { routeDisplayName, riskClass } from "../utils/helpers.js";
+import { riskClass, routeDisplayName } from "../utils/helpers.js";
 
-const DEMO_SHIPMENTS = [
-  { id: "FRK-IND-9281", route: "suez", risk: 0.72 },
-  { id: "FRK-IND-9104", route: "cape", risk: 0.38 },
-  { id: "FRK-IND-8872", route: "dubai", risk: 0.51 },
-  { id: "FRK-IND-8650", route: "suez", risk: 0.65 },
-];
-
-export default function RecentShipments({ prediction, routesMeta }) {
-  const currentId = prediction?.shipment_id;
+export default function RecentShipments({
+  shipments,
+  selectedId,
+  onSelect,
+  prediction,
+  routesMeta,
+}) {
+  const list = shipments || [];
   const routeNames = Object.fromEntries(
     (routesMeta || []).map((r) => [r.route_id, r.name])
   );
 
-  const rows = DEMO_SHIPMENTS.map((s) =>
-    s.id === currentId || s.id.replace(/FRK/g, "frankfurt").includes(currentId?.split("-")[0])
-      ? { ...s, risk: prediction?.node_predictions
-          ? prediction.node_predictions.reduce((a, n) => a + n.delay_probability, 0) /
-            prediction.node_predictions.length
-          : s.risk }
-      : s
-  );
+  const liveRisk =
+    prediction?.node_predictions?.length
+      ? prediction.node_predictions.reduce((a, n) => a + n.delay_probability, 0) /
+        prediction.node_predictions.length
+      : null;
+
+  if (list.length === 0) {
+    return <p className="muted">No shipments yet.</p>;
+  }
 
   return (
     <table className="data-table recent-table">
@@ -33,17 +33,30 @@ export default function RecentShipments({ prediction, routesMeta }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((s) => (
-          <tr key={s.id} className={s.id.startsWith("FRK-IND-9281") ? "highlight-row" : ""}>
-            <td className="mono">{s.id}</td>
-            <td>{routeNames[s.route] || routeDisplayName(s.route)}</td>
-            <td>
-              <span className={`risk-pill ${riskClass(s.risk)}`}>
-                {Math.round(s.risk * 100)}%
-              </span>
-            </td>
-          </tr>
-        ))}
+        {list.map((s) => {
+          const isCurrent = s.id === selectedId;
+          const risk = isCurrent ? liveRisk : null;
+          return (
+            <tr
+              key={s.id}
+              className={isCurrent ? "highlight-row clickable-row" : "clickable-row"}
+              onClick={() => onSelect && onSelect(s.id)}
+              title={isCurrent ? "Currently viewed" : `View ${s.id}`}
+            >
+              <td className="mono">{s.id}</td>
+              <td>{routeNames[s.routeId] || routeDisplayName(s.routeId)}</td>
+              <td>
+                {risk == null ? (
+                  <span className="muted">—</span>
+                ) : (
+                  <span className={`risk-pill ${riskClass(risk)}`}>
+                    {Math.round(risk * 100)}%
+                  </span>
+                )}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );

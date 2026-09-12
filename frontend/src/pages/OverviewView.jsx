@@ -12,7 +12,7 @@ import RecentShipments from "../components/RecentShipments.jsx";
 import WhatIfPanel from "../components/WhatIfPanel.jsx";
 
 export default function OverviewView({ data }) {
-  const { prediction, explanation, critical, health, dq, routesMeta } = data;
+  const { prediction, explanation, critical, health, dq, routesMeta, shipments, selectedId, onSelectShipment } = data;
 
   return (
     <div className="view-stack">
@@ -72,7 +72,13 @@ export default function OverviewView({ data }) {
             </section>
             <section className="panel compact">
               <h2>Recent Shipments</h2>
-              <RecentShipments prediction={prediction} routesMeta={routesMeta} />
+              <RecentShipments
+                shipments={shipments}
+                selectedId={selectedId}
+                onSelect={onSelectShipment}
+                prediction={prediction}
+                routesMeta={routesMeta}
+              />
             </section>
           </div>
         </div>

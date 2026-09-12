@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import { clearSession, getSession, saveSession } from "./auth.js";
+import {
+  loadSelectedId,
+  loadShipments,
+  saveSelectedId,
+  saveShipments,
+} from "./shipments.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Header from "./components/Header.jsx";
 import LoginView from "./pages/LoginView.jsx";
@@ -35,6 +41,8 @@ export default function App() {
   const [user, setUser] = useState(() => getSession()?.username || null);
   const [view, setView] = useState("overview");
   const [route, setRoute] = useState(DEFAULT_ROUTE);
+  const [shipments, setShipments] = useState(() => loadShipments());
+  const [selectedId, setSelectedId] = useState(() => loadSelectedId());
   const [nSim, setNSim] = useState(DEFAULT_NSIM);
   const [routesMeta, setRoutesMeta] = useState([]);
   const [prediction, setPrediction] = useState(null);
@@ -89,9 +97,53 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     loadRoutes();
-    loadBase(DEFAULT_ROUTE, nSim);
+    const list = shipments;
+    const initial =
+      list.find((s) => s.id === selectedId) || list[0] || null;
+    if (initial) {
+      setSelectedId(initial.id);
+      saveSelectedId(initial.id);
+      setRoute(initial.routeId);
+      loadBase(initial.routeId, nSim);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loadRoutes]);
+
+  const selectShipment = (id, list = shipments) => {
+    const found = list.find((s) => s.id === id);
+    if (!found) return;
+    setSelectedId(found.id);
+    saveSelectedId(found.id);
+    setRoute(found.routeId);
+    loadBase(found.routeId, nSim);
+  };
+
+  const addShipment = (fields) => {
+    const next = [...shipments, fields];
+    setShipments(next);
+    saveShipments(next);
+    selectShipment(fields.id, next);
+    setView("shipments");
+  };
+
+  const deleteShipment = (id) => {
+    const next = shipments.filter((s) => s.id !== id);
+    setShipments(next);
+    saveShipments(next);
+    if (id === selectedId) {
+      if (next.length > 0) {
+        selectShipment(next[0].id, next);
+      } else {
+        setSelectedId(null);
+        setPrediction(null);
+        setExplanation(null);
+        setCritical(null);
+      }
+    }
+  };
+
+  const selectedShipment =
+    shipments.find((s) => s.id === selectedId) || shipments[0] || null;
 
   const handleLogin = (username) => {
     saveSession(username);
@@ -108,11 +160,6 @@ export default function App() {
     setView("overview");
   };
 
-  const selectRoute = (routeId) => {
-    setRoute(routeId);
-    loadBase(routeId, nSim);
-  };
-
   const ViewComponent = VIEWS[view] || OverviewView;
   const data = {
     prediction,
@@ -122,7 +169,12 @@ export default function App() {
     dq,
     routesMeta,
     route,
-    onRouteChange: selectRoute,
+    shipments,
+    selectedId,
+    selectedShipment,
+    onSelectShipment: selectShipment,
+    onAddShipment: addShipment,
+    onDeleteShipment: deleteShipment,
   };
 
   if (!user) {
@@ -134,9 +186,9 @@ export default function App() {
       <Sidebar active={view} onSelect={setView} />
       <div className="main-area">
         <Header
-          route={route}
-          routesMeta={routesMeta}
-          onRouteChange={selectRoute}
+          shipments={shipments}
+          selectedId={selectedShipment?.id}
+          onSelectShipment={selectShipment}
           loading={loading}
           lastUpdated={lastUpdated}
           onRefresh={() => loadBase(route, nSim)}
