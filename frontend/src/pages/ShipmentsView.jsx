@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import RecentShipments from "../components/RecentShipments.jsx";
 import CheckpointCards from "../components/CheckpointCards.jsx";
+import AlertsPanel from "../components/AlertsPanel.jsx";
 import {
   blankShipment,
   PRIORITIES,
@@ -270,6 +271,11 @@ export default function ShipmentsView({ data }) {
           prediction={prediction}
           routesMeta={routesMeta}
         />
+      </section>
+
+      <section className="panel compact">
+        <h2>Early Warning Alerts</h2>
+        <AlertsPanel nodes={prediction?.node_predictions} />
       </section>
     </div>
   );

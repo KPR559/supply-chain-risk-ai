@@ -10,32 +10,38 @@ import {
 import Sidebar from "./components/Sidebar.jsx";
 import Header from "./components/Header.jsx";
 import LoginView from "./pages/LoginView.jsx";
-import OverviewView from "./pages/OverviewView.jsx";
+import PredictionResultsView from "./pages/PredictionResultsView.jsx";
 import RouteMapView from "./pages/RouteMapView.jsx";
-import RiskRadarView from "./pages/RiskRadarView.jsx";
-import SimulatorView from "./pages/SimulatorView.jsx";
+import CheckpointRiskView from "./pages/CheckpointRiskView.jsx";
 import ShipmentsView from "./pages/ShipmentsView.jsx";
-import AlertsView from "./pages/AlertsView.jsx";
-import AnalyticsView from "./pages/AnalyticsView.jsx";
-import ReportsView from "./pages/ReportsView.jsx";
+import EtaDistributionView from "./pages/EtaDistributionView.jsx";
+import DeadlineRiskView from "./pages/DeadlineRiskView.jsx";
+import CriticalCheckpointsView from "./pages/CriticalCheckpointsView.jsx";
+import RiskContributorsView from "./pages/RiskContributorsView.jsx";
+import WhatIfView from "./pages/WhatIfView.jsx";
+import CompareRoutesView from "./pages/CompareRoutesView.jsx";
+import ChartsGraphsView from "./pages/ChartsGraphsView.jsx";
 
 const DEFAULT_ROUTE = "suez";
 const DEFAULT_NSIM = 10000;
 
 const VIEWS = {
-  overview: OverviewView,
+  results: PredictionResultsView,
   map: RouteMapView,
-  radar: RiskRadarView,
-  sim: SimulatorView,
+  checkpoints: CheckpointRiskView,
   shipments: ShipmentsView,
-  alerts: AlertsView,
-  analytics: AnalyticsView,
-  reports: ReportsView,
+  eta: EtaDistributionView,
+  deadline: DeadlineRiskView,
+  critical: CriticalCheckpointsView,
+  contributors: RiskContributorsView,
+  simulator: WhatIfView,
+  compare: CompareRoutesView,
+  charts: ChartsGraphsView,
 };
 
 export default function App() {
   const [user, setUser] = useState(() => getSession()?.username || null);
-  const [view, setView] = useState("overview");
+  const [view, setView] = useState("results");
   const [route, setRoute] = useState(DEFAULT_ROUTE);
   const [shipments, setShipments] = useState(() => loadShipments());
   const [selectedId, setSelectedId] = useState(() => loadSelectedId());
@@ -153,10 +159,10 @@ export default function App() {
     setExplanation(null);
     setCritical(null);
     setError(null);
-    setView("overview");
+    setView("results");
   };
 
-  const ViewComponent = VIEWS[view] || OverviewView;
+  const ViewComponent = VIEWS[view] || PredictionResultsView;
   const data = {
     prediction,
     explanation,

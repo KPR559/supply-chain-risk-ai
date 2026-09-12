@@ -22,8 +22,8 @@ Live: <https://shipment-delay-frontend.vercel.app>
 | `src/api.js` | API client over `/api/v1` (base from `VITE_API_BASE`) |
 | `src/auth.js` | demo login gate (default creds + localStorage session) |
 | `src/shipments.js` | shipment registry store (seed records + localStorage) |
-| `src/pages/` | 10 views: Overview, Route Map, Risk Radar, Simulator, Shipments, Alerts, Analytics, Reports, Data Sources, Settings |
-| `src/components/` | 17 reusable components (RouteMap, PercentileChart, WhatIfPanel, Explanation, …) |
+| `src/pages/` \| 11 feature tabs, one per feature: Prediction Results, Route Map, Checkpoint Risk, Shipment Status, ETA Distribution, Deadline Risk, Critical Checkpoints, Risk Contributors, What-if Simulator, Route Comparison, Charts & Graphs
+| `src/components/` \| 16 reusable components (route map, percentile chart, what-if panel, explanation bars...)
 | `src/utils/helpers.js` | risk thresholds/colors, formatting, resilience score |
 
 ## Run

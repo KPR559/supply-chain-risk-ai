@@ -1,17 +1,20 @@
 import React from "react";
 
 export const NAV_ITEMS = [
-  { id: "overview", label: "Overview", icon: "◉" },
+  { id: "results", label: "Prediction Results", icon: "◉" },
   { id: "map", label: "Route Map", icon: "◎" },
-  { id: "radar", label: "Risk Radar", icon: "◈" },
-  { id: "sim", label: "What-if Simulator", icon: "⬡" },
-  { id: "shipments", label: "Shipments", icon: "▣" },
-  { id: "alerts", label: "Alerts", icon: "⚠" },
-  { id: "analytics", label: "Analytics", icon: "▤" },
-  { id: "reports", label: "Reports", icon: "▥" },
+  { id: "checkpoints", label: "Checkpoint Risk", icon: "◈" },
+  { id: "shipments", label: "Shipment Status", icon: "▣" },
+  { id: "eta", label: "ETA Distribution", icon: "◔" },
+  { id: "deadline", label: "Deadline Risk", icon: "⚑" },
+  { id: "critical", label: "Critical Checkpoints", icon: "⚠" },
+  { id: "contributors", label: "Risk Contributors", icon: "◫" },
+  { id: "simulator", label: "What-if Simulator", icon: "⬡" },
+  { id: "compare", label: "Route Comparison", icon: "⇄" },
+  { id: "charts", label: "Charts & Graphs", icon: "▤" },
 ];
 
-export default function Sidebar({ active = "overview", onSelect, user, onLogout }) {
+export default function Sidebar({ active = "results", onSelect, user, onLogout }) {
   return (
     <aside className="sidebar">
       <nav className="sidebar-nav">
