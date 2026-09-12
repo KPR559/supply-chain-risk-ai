@@ -129,6 +129,19 @@ export default function App() {
     setView("shipments");
   };
 
+  const updateShipment = (id, fields) => {
+    const next = shipments.map((s) => (s.id === id ? { ...fields, id } : s));
+    setShipments(next);
+    saveShipments(next);
+    if (id === selectedId) {
+      const updated = next.find((s) => s.id === id);
+      if (updated) {
+        setRoute(updated.routeId);
+        loadBase(updated.routeId, nSim, updated.requiredDate || null);
+      }
+    }
+  };
+
   const deleteShipment = (id) => {
     const next = shipments.filter((s) => s.id !== id);
     setShipments(next);
@@ -180,6 +193,7 @@ export default function App() {
     onRetry: () => loadBase(route, nSim, selectedShipment?.requiredDate || null),
     onSelectShipment: selectShipment,
     onAddShipment: addShipment,
+    onEditShipment: updateShipment,
     onDeleteShipment: deleteShipment,
   };
 

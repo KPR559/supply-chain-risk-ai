@@ -62,7 +62,8 @@ The Shipments view keeps one independent record per shipment (ID, origin,
 destination, type, transport mode, departure / expected-arrival / required
 dates, priority, current location, status, plus the corridor route used for
 prediction). The header's Shipment ID dropdown switches between records;
-**+ Add shipment** creates a new one (ID must be unique), Delete removes it.
+**+ Add shipment** creates a new one (ID must be unique), **Edit** modifies any
+record in place (ID is immutable), Delete removes it.
 Records persist in `localStorage` (`src/shipments.js`).
 
 ## Tab states

@@ -840,6 +840,7 @@ input[type="number"] { width: 90px; }
 }
 .form-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
 .form-field input, .form-field select { width: 100%; }
+.form-field input:disabled { opacity: 0.55; cursor: not-allowed; }
 .form-error { color: var(--red); font-style: normal; font-size: 11px; }
 .form-actions { display: flex; gap: 10px; margin-top: 14px; }
 .table-actions { white-space: nowrap; text-align: right; }

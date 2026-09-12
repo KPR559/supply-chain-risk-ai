@@ -41,8 +41,9 @@ const INFO_ROWS = [
   ["status", "Current Status"],
 ];
 
-function AddShipmentForm({ shipments, routesMeta, onAdd, onCancel }) {
-  const [form, setForm] = useState(blankShipment());
+function ShipmentForm({ shipments, routesMeta, initial, onSubmit, onCancel }) {
+  const isEdit = Boolean(initial);
+  const [form, setForm] = useState(() => (initial ? { ...initial } : blankShipment()));
   const [errors, setErrors] = useState({});
 
   const set = (key, value) => {
@@ -59,13 +60,16 @@ function AddShipmentForm({ shipments, routesMeta, onAdd, onCancel }) {
     const errs = {};
     const id = form.id.trim();
     if (!id) errs.id = "Shipment ID is required.";
-    else if (shipments.some((s) => s.id.toLowerCase() === id.toLowerCase()))
+    else if (
+      !isEdit &&
+      shipments.some((s) => s.id.toLowerCase() === id.toLowerCase())
+    )
       errs.id = "This Shipment ID already exists.";
     if (!form.origin.trim()) errs.origin = "Origin is required.";
     if (!form.destination.trim()) errs.destination = "Destination is required.";
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    onAdd({
+    onSubmit({
       ...form,
       id,
       origin: form.origin.trim(),
@@ -78,7 +82,7 @@ function AddShipmentForm({ shipments, routesMeta, onAdd, onCancel }) {
 
   return (
     <form className="panel ship-form" onSubmit={submit}>
-      <h2>Add Shipment</h2>
+      <h2>{isEdit ? `Edit Shipment ${initial.id}` : "Add Shipment"}</h2>
       <div className="form-grid">
         {FIELD_DEFS.map(([key, label, type, placeholder]) => (
           <label key={key} className="form-field">
@@ -87,6 +91,8 @@ function AddShipmentForm({ shipments, routesMeta, onAdd, onCancel }) {
               type={type}
               value={form[key]}
               placeholder={placeholder}
+              disabled={isEdit && key === "id"}
+              title={isEdit && key === "id" ? "Shipment ID cannot be changed" : undefined}
               onChange={(e) => set(key, e.target.value)}
             />
             {errors[key] && <em className="form-error">{errors[key]}</em>}
@@ -118,7 +124,7 @@ function AddShipmentForm({ shipments, routesMeta, onAdd, onCancel }) {
         </label>
       </div>
       <div className="form-actions">
-        <button className="btn" type="submit">Add shipment</button>
+        <button className="btn" type="submit">{isEdit ? "Save changes" : "Add shipment"}</button>
         <button className="btn ghost" type="button" onClick={onCancel}>Cancel</button>
       </div>
     </form>
@@ -134,12 +140,28 @@ export default function ShipmentsView({ data }) {
     selectedShipment,
     onSelectShipment,
     onAddShipment,
+    onEditShipment,
     onDeleteShipment,
     loading,
     apiError,
     onRetry,
   } = data;
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const editingShipment = editingId ? list.find((s) => s.id === editingId) || null : null;
+
+  const openAdd = () => {
+    setEditingId(null);
+    setShowForm((v) => !v);
+  };
+  const openEdit = (id) => {
+    setShowForm(false);
+    setEditingId(id);
+  };
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+  };
   const mc = prediction?.monte_carlo;
   const nodes = prediction?.node_predictions || [];
   const list = shipments || [];
@@ -151,20 +173,34 @@ export default function ShipmentsView({ data }) {
           <div className="view-title">Shipments</div>
           <div className="view-sub">Each shipment keeps its own independent record</div>
         </div>
-        <button className="btn" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Close form" : "+ Add shipment"}
+        <button className="btn" onClick={openAdd}>
+          {showForm && !editingShipment ? "Close form" : "+ Add shipment"}
         </button>
       </div>
 
-      {showForm && (
-        <AddShipmentForm
+      {showForm && !editingShipment && (
+        <ShipmentForm
           shipments={list}
           routesMeta={routesMeta}
-          onAdd={(fields) => {
+          onSubmit={(fields) => {
             onAddShipment(fields);
-            setShowForm(false);
+            closeForm();
           }}
-          onCancel={() => setShowForm(false)}
+          onCancel={closeForm}
+        />
+      )}
+
+      {editingShipment && (
+        <ShipmentForm
+          key={editingShipment.id}
+          shipments={list}
+          routesMeta={routesMeta}
+          initial={editingShipment}
+          onSubmit={(fields) => {
+            onEditShipment(editingShipment.id, fields);
+            closeForm();
+          }}
+          onCancel={closeForm}
         />
       )}
 
@@ -257,6 +293,13 @@ export default function ShipmentsView({ data }) {
                         View
                       </button>
                     )}
+                    <button
+                      className="btn ghost mini-btn"
+                      onClick={() => openEdit(s.id)}
+                      title={`Edit ${s.id}`}
+                    >
+                      Edit
+                    </button>
                     <button
                       className="btn danger mini-btn"
                       onClick={() => onDeleteShipment(s.id)}
