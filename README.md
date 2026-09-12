@@ -31,37 +31,17 @@ Delivered through a **FastAPI** backend and a **React + Vite** dashboard, with a
 
 Requirements: **Python ≥ 3.10** (tested on 3.13) and **Node ≥ 18** (tested on 24).
 
-**Windows**
-
-```powershell
-.\run.ps1
-```
-
-**macOS / Linux**
-
-```bash
-./run.sh
-```
-
-The runner installs deps, (re)generates synthetic data, trains/loads models,
-evaluates, runs the test suite, then launches the API
-(`http://127.0.0.1:8000`, interactive docs at `/docs`) and the dashboard
-(`http://127.0.0.1:5173`).
-
-### Manual steps
-
 ```bash
 pip install -r requirements.txt
 
-python -m backend.core.train --generate-only   # generate + validate synthetic data
-python -m backend.core.train --train-only      # train classifier + delay quantile models
-python -m backend.core.train --eval-only       # evaluate and write metrics
+python -m backend.core.train   # generate data, train models, evaluate
+                               # (or step by step: --generate-only / --train-only / --eval-only)
 
-uvicorn backend.app.main:app --port 8000   # API (http://127.0.0.1:8000/docs)
+uvicorn backend.app.main:app --port 8000   # API: http://127.0.0.1:8000 (docs at /docs)
 
 cd frontend
 npm install
-npm run dev                            # dashboard (Vite proxies /api -> :8000)
+npm run dev                    # dashboard: http://127.0.0.1:5173 (proxies /api -> :8000)
 ```
 
 > **Dev/experiments only:** install `requirements-dev.txt` for the heavier stack
