@@ -8,6 +8,7 @@ import {
   saveShipments,
 } from "./shipments.js";
 import Sidebar from "./components/Sidebar.jsx";
+import MobileNav from "./components/MobileNav.jsx";
 import Header from "./components/Header.jsx";
 import LoginView from "./pages/LoginView.jsx";
 import PredictionResultsView from "./pages/PredictionResultsView.jsx";
@@ -190,6 +191,7 @@ export default function App() {
     <div className="app-shell">
       <Sidebar active={view} onSelect={setView} user={user} onLogout={handleLogout} />
       <div className="main-area">
+        <MobileNav active={view} onSelect={setView} onLogout={handleLogout} />
         <Header
           shipments={shipments}
           selectedId={selectedShipment?.id}

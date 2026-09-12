@@ -892,3 +892,71 @@ input[type="number"] { width: 90px; }
 }
 @keyframes tab-spin { to { transform: rotate(360deg); } }
 .empty-state { color: var(--muted); font-size: 13px; }
+
+/* Mobile nav (visible only when the sidebar is hidden) */
+.mobile-nav { display: none; }
+
+@media (max-width: 768px) {
+  .main-area { padding: 0 12px 32px; }
+  .panel { padding: 12px 14px; }
+  .panel.compact { padding: 12px 14px; }
+
+  .mobile-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .mobile-nav-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    flex: 1;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+  .nav-chip {
+    white-space: nowrap;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 16px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: var(--sans);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nav-chip.active {
+    background: rgba(76, 194, 255, 0.12);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .mobile-logout { padding: 6px 10px; flex-shrink: 0; }
+
+  .header-controls { flex-wrap: wrap; gap: 12px; }
+  .shipment-select { min-width: 0; flex: 1 1 100%; }
+  .shipment-select select { width: 100%; }
+
+  .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .data-table th, .data-table td { white-space: nowrap; }
+
+  .deadline-hero { flex-wrap: wrap; gap: 16px; }
+  .deadline-pct { font-size: 44px; }
+  .login-card { padding: 22px; }
+}
+
+@media (max-width: 480px) {
+  .kpi-value { font-size: 18px; }
+  .kpi-card { padding: 10px 12px; }
+  .page-title-block h1 { font-size: 15px; }
+  .view-title { font-size: 16px; }
+  .form-actions { flex-direction: column; }
+  .form-actions .btn { width: 100%; }
+}

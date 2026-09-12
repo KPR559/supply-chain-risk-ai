@@ -73,6 +73,14 @@ unreachable, and a friendly empty notice when there is nothing to show yet.
 `App.jsx` passes `loading`, `apiError` and `onRetry` to all views via `data` —
 with the backend stopped, no tab ever shows a blank screen or crashes.
 
+## Responsive
+
+The sidebar hides at ≤ 768 px and a sticky `MobileNav` chip bar
+(`src/components/MobileNav.jsx`) takes over navigation + logout. Below that
+breakpoint tables scroll horizontally, the header controls stack full-width,
+and padding/KPI type scale down (480 px tune). Verify phone-width (390 px) by
+resizing — all 11 tabs must work with no overlap or clipped controls.
+
 ## Deadline risk
 
 Each prediction sends the selected shipment's Required Delivery Date as
