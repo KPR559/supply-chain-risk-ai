@@ -19,6 +19,13 @@ export const ROUTE_IDS = ["suez", "cape", "dubai"];
 const STORE_KEY = "scm.shipments.v1";
 const SELECTED_KEY = "scm.selectedShipment.v1";
 
+// Records are namespaced per account: every login gets an isolated registry.
+// `userKey` is `${base}.${username}`; the old shared keys are adopted once
+// (so pre-existing records move to whoever signs in first) and then removed.
+function userKey(base, username) {
+  return username ? `${base}.${username.toLowerCase()}` : base;
+}
+
 const SEED = [
   {
     id: "SHP001",
@@ -81,23 +88,45 @@ function write(key, value) {
   }
 }
 
-export function loadShipments() {
-  const stored = read(STORE_KEY);
+function drop(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+export function loadShipments(username) {
+  const stored = read(userKey(STORE_KEY, username));
   if (Array.isArray(stored) && stored.length > 0) return stored;
+  const legacy = read(STORE_KEY);
+  if (Array.isArray(legacy) && legacy.length > 0) {
+    // Adopt the old shared registry once, then drop it.
+    write(userKey(STORE_KEY, username), legacy);
+    drop(STORE_KEY);
+    return legacy;
+  }
   return SEED.map((s) => ({ ...s }));
 }
 
-export function saveShipments(list) {
-  write(STORE_KEY, list);
+export function saveShipments(list, username) {
+  write(userKey(STORE_KEY, username), list);
 }
 
-export function loadSelectedId() {
-  const saved = read(SELECTED_KEY);
-  return typeof saved === "string" ? saved : null;
+export function loadSelectedId(username) {
+  const saved = read(userKey(SELECTED_KEY, username));
+  if (typeof saved === "string") return saved;
+  const legacy = read(SELECTED_KEY);
+  if (typeof legacy === "string") {
+    write(userKey(SELECTED_KEY, username), legacy);
+    drop(SELECTED_KEY);
+    return legacy;
+  }
+  return null;
 }
 
-export function saveSelectedId(id) {
-  write(SELECTED_KEY, id);
+export function saveSelectedId(id, username) {
+  write(userKey(SELECTED_KEY, username), id);
 }
 
 export function blankShipment() {

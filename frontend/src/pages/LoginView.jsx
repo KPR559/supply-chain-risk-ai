@@ -88,11 +88,6 @@ export default function LoginView({ onLogin, onRegister }) {
             ))}
           </ul>
 
-          <div className="login-side-stats">
-            <div><b>10</b><span>checkpoints</span></div>
-            <div><b>3</b><span>corridors</span></div>
-            <div><b>10k</b><span>simulations</span></div>
-          </div>
         </div>
       </aside>
 
@@ -175,11 +170,8 @@ export default function LoginView({ onLogin, onRegister }) {
               Username: 3–32 chars (letters, digits, <code>_ . -</code>) ·
               password: min 8 characters.
             </p>
-          ) : (
-            <p className="login-hint">
-              Demo credentials — username <code>{DEFAULT_CREDENTIALS.username}</code>
-              {" · "}password <code>{DEFAULT_CREDENTIALS.password}</code>
-            </p>
+          ) : ( 
+            null
           )}
 
           <label className="remember-row">

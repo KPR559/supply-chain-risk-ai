@@ -45,8 +45,8 @@ export default function App() {
   const [token, setToken] = useState(() => getSession()?.token || null);
   const [view, setView] = useState("results");
   const [route, setRoute] = useState(DEFAULT_ROUTE);
-  const [shipments, setShipments] = useState(() => loadShipments());
-  const [selectedId, setSelectedId] = useState(() => loadSelectedId());
+  const [shipments, setShipments] = useState(() => loadShipments(user));
+  const [selectedId, setSelectedId] = useState(() => loadSelectedId(user));
   const [nSim, setNSim] = useState(DEFAULT_NSIM);
   const [routesMeta, setRoutesMeta] = useState([]);
   const [prediction, setPrediction] = useState(null);
@@ -101,12 +101,15 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     loadRoutes();
-    const list = shipments;
+    // Registry is per account: reload it on every sign-in / account switch.
+    const list = loadShipments(user);
+    setShipments(list);
+    const saved = loadSelectedId(user);
     const initial =
-      list.find((s) => s.id === selectedId) || list[0] || null;
+      list.find((s) => s.id === saved) || list[0] || null;
     if (initial) {
       setSelectedId(initial.id);
-      saveSelectedId(initial.id);
+      saveSelectedId(initial.id, user);
       setRoute(initial.routeId);
       loadBase(initial.routeId, nSim, initial.requiredDate || null);
     }
@@ -117,7 +120,7 @@ export default function App() {
     const found = list.find((s) => s.id === id);
     if (!found) return;
     setSelectedId(found.id);
-    saveSelectedId(found.id);
+    saveSelectedId(found.id, user);
     setRoute(found.routeId);
     loadBase(found.routeId, nSim, found.requiredDate || null);
   };
@@ -125,7 +128,7 @@ export default function App() {
   const addShipment = (fields) => {
     const next = [...shipments, fields];
     setShipments(next);
-    saveShipments(next);
+    saveShipments(next, user);
     selectShipment(fields.id, next);
     setView("shipments");
   };
@@ -133,7 +136,7 @@ export default function App() {
   const updateShipment = (id, fields) => {
     const next = shipments.map((s) => (s.id === id ? { ...fields, id } : s));
     setShipments(next);
-    saveShipments(next);
+    saveShipments(next, user);
     if (id === selectedId) {
       const updated = next.find((s) => s.id === id);
       if (updated) {
@@ -146,7 +149,7 @@ export default function App() {
   const deleteShipment = (id) => {
     const next = shipments.filter((s) => s.id !== id);
     setShipments(next);
-    saveShipments(next);
+    saveShipments(next, user);
     if (id === selectedId) {
       if (next.length > 0) {
         selectShipment(next[0].id, next);

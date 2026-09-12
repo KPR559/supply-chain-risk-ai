@@ -69,7 +69,10 @@ dates, priority, current location, status, plus the corridor route used for
 prediction). The header's Shipment ID dropdown switches between records;
 **+ Add shipment** creates a new one (ID must be unique), **Edit** modifies any
 record in place (ID is immutable), Delete removes it.
-Records persist in `localStorage` (`src/shipments.js`).
+Records are **isolated per account** (`scm.shipments.v1.<username>` in
+`localStorage`, `src/shipments.js`) — switching accounts reloads that
+account's own registry, so one user's edits never leak into another's.
+A pre-existing shared registry is adopted once by whoever signs in first.
 
 ## Tab states
 
