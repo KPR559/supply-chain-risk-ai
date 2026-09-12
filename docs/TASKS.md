@@ -140,7 +140,7 @@ Goal: onboarding in minutes and green builds on every PR. All independent.
   and `npm run build` on every push/PR.
 - **Done when:** the workflow file is merged and shows green on its own PR.
 
-### T4.2 — Docker one-command stack
+### T4.2 — ~~Docker one-command stack~~ DROPPED (project decision: no Docker)
 - **Depends on:** nothing. **Files:** `backend/Dockerfile`,
   `frontend/Dockerfile`, `docker-compose.yml` (new), `README.md`.
 - `docker compose up` starts API (:8000) + dashboard (:5173, pointed at the
