@@ -89,11 +89,27 @@ body {
 
 .nav-icon { font-size: 14px; width: 18px; text-align: center; }
 
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 14px 14px;
+  border-bottom: 1px solid var(--border);
+  margin: 0 0 12px;
+}
+
 .sidebar-footer {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 10px;
+  padding: 12px 10px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
 }
 .sidebar-user {
   display: flex;
@@ -110,15 +126,6 @@ body {
   flex-shrink: 0;
 }
 .logout-btn-full { width: 100%; }
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 4px 4px;
-  border-top: 1px solid var(--border);
-  margin: 2px 0 0;
-}
 
 .brand-logo {
   width: 36px; height: 36px;

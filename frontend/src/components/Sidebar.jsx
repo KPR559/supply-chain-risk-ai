@@ -17,21 +17,30 @@ export const NAV_ITEMS = [
 export default function Sidebar({ active = "results", onSelect, user, onLogout }) {
   return (
     <aside className="sidebar">
-      <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            className={`nav-item ${active === item.id ? "active" : ""}`}
-            title={item.label}
-            type="button"
-            aria-pressed={active === item.id}
-            onClick={() => onSelect && onSelect(item.id)}
-          >
-            <span className="nav-icon">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
-          </button>
-        ))}
-      </nav>
+      <div className="sidebar-top">
+        <div className="sidebar-brand">
+          <div className="brand-logo">∞</div>
+          <div>
+            <div className="brand-name">LOGIX</div>
+            <div className="brand-sub">AI Supply Chain Suite</div>
+          </div>
+        </div>
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${active === item.id ? "active" : ""}`}
+              title={item.label}
+              type="button"
+              aria-pressed={active === item.id}
+              onClick={() => onSelect && onSelect(item.id)}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
       <div className="sidebar-footer">
         {user && (
           <div className="sidebar-user" title={`Signed in as ${user}`}>
@@ -44,13 +53,6 @@ export default function Sidebar({ active = "results", onSelect, user, onLogout }
             ⏻ Log out
           </button>
         )}
-        <div className="sidebar-brand">
-          <div className="brand-logo">∞</div>
-          <div>
-            <div className="brand-name">LOGIX</div>
-            <div className="brand-sub">AI Supply Chain Suite</div>
-          </div>
-        </div>
       </div>
     </aside>
   );
