@@ -85,40 +85,39 @@ artifacts/
 ## 4. Reference metrics (current artifacts)
 
 Generated with `--no-xgboost` on the seeded synthetic dataset
-(version `1.0.0`, trained 2026-08-30).
+(version `1.0.0`, trained 2026-09-12).
 
 ### Classification (delay > 24 h)
 
 | Metric | Validation | Test |
 |---|---|---|
-| ROC-AUC | 0.990 | **0.968** |
-| PR-AUC | 0.963 | **0.930** |
-| Precision | 0.923 | 0.856 |
-| Recall | 0.964 | 0.913 |
-| F1 | 0.943 | **0.884** |
-| ECE (test) | — | **0.0089** |
+| ROC-AUC | 0.985 | **0.987** |
+| PR-AUC | 0.937 | **0.953** |
+| Precision | 0.885 | 0.867 |
+| Recall | 0.975 | 0.977 |
+| F1 | 0.927 | **0.919** |
+| ECE (test) | — | **0.0098** |
 
-Operating threshold (max F1, from validation): **0.429**.
-Class balance: 977 positive / 6563 negative (scale pos weight ~6.7).
-Split sizes: 7540 train / 1620 val / 1610 test.
+Operating threshold (max F1, from validation): **0.038**.
+Split sizes: 7560 train / 1630 val / 1610 test.
 
 ### Delay quantiles (hours)
 
 | Quantile | Test MAE | Pinball (test) |
 |---|---|---|
-| P50 | 1.088 | 0.544 |
-| P80 | 1.401 | 0.421 |
-| P90 | 1.903 | 0.299 |
+| P50 | 1.144 | 0.572 |
+| P80 | 1.234 | 0.397 |
+| P90 | 1.720 | 0.268 |
 
-Median model (P50) headline: **MAE 1.088 d · RMSE 3.333 d**.
+Median model (P50) headline: **MAE 1.144 d · RMSE 3.647 d**.
 
 ### Monte Carlo coverage (test, n_sim=10 000)
 
 | Interval | Empirical coverage |
 |---|---|
-| P50 | 0.506 |
-| P80 | 0.778 |
-| P90 | 0.881 |
+| P50 | 0.504 |
+| P80 | 0.768 |
+| P90 | 0.876 |
 
 ### Demo prediction (`GET /api/v1/demo`)
 
