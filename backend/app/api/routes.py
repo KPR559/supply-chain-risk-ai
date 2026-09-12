@@ -7,11 +7,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 
 from backend.app.schemas.models import (CompareRoutesRequest, LoginRequest, PredictRequest,
-                                    ScenarioAdjustment, SimulateRequest,
-                                    WhatIfRequest)
+                                     RegisterRequest, ScenarioAdjustment, SimulateRequest,
+                                     WhatIfRequest)
 from backend.core import storage
-from backend.core.auth import (authenticate, create_session, revoke_token,
-                               verify_token)
+from backend.core.auth import (UsernameTakenError, authenticate, create_session,
+                               register_user, revoke_token, verify_token)
 from backend.core.config import get_settings
 from backend.core.graph import topology
 from backend.core.logging_util import get_logger, log_with
@@ -86,6 +86,17 @@ def login(req: LoginRequest) -> Dict[str, Any]:
     username = authenticate(req.username.strip(), req.password)
     if username is None:
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    token, expires_at = create_session(username)
+    return {"token": token, "username": username,
+            "expires_at": expires_at.isoformat()}
+
+
+@router.post("/register", status_code=201)
+def register(req: RegisterRequest) -> Dict[str, Any]:
+    try:
+        username = register_user(req.username, req.password)
+    except UsernameTakenError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     token, expires_at = create_session(username)
     return {"token": token, "username": username,
             "expires_at": expires_at.isoformat()}

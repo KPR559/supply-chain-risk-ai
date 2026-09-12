@@ -47,6 +47,13 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$",
+                          description="3-32 chars: letters, digits, _ . -")
+    password: str = Field(min_length=8, max_length=128,
+                          description="Minimum 8 characters")
+
+
 class GetShipmentResponse(BaseModel):
     shipment_id: str
     origin: str

@@ -28,6 +28,7 @@ async function post(path, body, { token = null } = {}) {
 export const api = {
   health: () => get("/health"),
   login: (username, password) => post("/login", { username, password }),
+  register: (username, password) => post("/register", { username, password }),
   me: (token) => get("/me", { token }),
   logout: (token) => post("/logout", {}, { token }),
   demo: () => get("/demo"),

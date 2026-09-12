@@ -24,20 +24,36 @@ const HIGHLIGHTS = [
   },
 ];
 
-export default function LoginView({ onLogin }) {
+export default function LoginView({ onLogin, onRegister }) {
+  const [mode, setMode] = useState("signin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  const isSignup = mode === "signup";
+
+  const switchMode = (next) => {
+    setMode(next);
+    setError(null);
+    setConfirm("");
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    if (isSignup && password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const err = await onLogin(username.trim(), password, remember);
+      const err = isSignup
+        ? await onRegister(username.trim(), password, remember)
+        : await onLogin(username.trim(), password, remember);
       if (err) setError(err);
     } finally {
       setBusy(false);
@@ -83,7 +99,28 @@ export default function LoginView({ onLogin }) {
       <main className="login-main">
         <form className="login-card" onSubmit={submit}>
           <div className="login-brand">LOGIX</div>
-          <h2 className="login-title">Sign in</h2>
+          <h2 className="login-title">{isSignup ? "Create account" : "Sign in"}</h2>
+
+          <div className="auth-tabs" role="tablist" aria-label="Sign in or create account">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!isSignup}
+              className={`auth-tab ${!isSignup ? "active" : ""}`}
+              onClick={() => switchMode("signin")}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isSignup}
+              className={`auth-tab ${isSignup ? "active" : ""}`}
+              onClick={() => switchMode("signup")}
+            >
+              Create account
+            </button>
+          </div>
 
           {error && <div className="banner error login-error">{error}</div>}
 
@@ -121,6 +158,30 @@ export default function LoginView({ onLogin }) {
             </div>
           </label>
 
+          {isSignup && (
+            <label className="login-field">
+              <span>Confirm password</span>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+                placeholder="••••••••"
+              />
+            </label>
+          )}
+          {isSignup ? (
+            <p className="login-hint">
+              Username: 3–32 chars (letters, digits, <code>_ . -</code>) ·
+              password: min 8 characters.
+            </p>
+          ) : (
+            <p className="login-hint">
+              Demo credentials — username <code>{DEFAULT_CREDENTIALS.username}</code>
+              {" · "}password <code>{DEFAULT_CREDENTIALS.password}</code>
+            </p>
+          )}
+
           <label className="remember-row">
             <input
               type="checkbox"
@@ -131,7 +192,7 @@ export default function LoginView({ onLogin }) {
           </label>
 
           <button className="btn login-btn" type="submit" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in →"}
+            {busy ? (isSignup ? "Creating account…" : "Signing in…") : isSignup ? "Create account →" : "Sign in →"}
           </button>
 
         </form>

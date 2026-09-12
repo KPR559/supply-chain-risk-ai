@@ -174,6 +174,18 @@ export default function App() {
     }
   };
 
+  const handleRegister = async (username, password, remember) => {
+    try {
+      const res = await api.register(username, password);
+      saveSession(res.username || username, res.token, remember);
+      setUser(res.username || username);
+      setToken(res.token);
+      return null;
+    } catch (e) {
+      return e.message || "Sign-up failed. Is the API running?";
+    }
+  };
+
   const handleLogout = async () => {
     if (token) {
       try {
@@ -242,7 +254,7 @@ export default function App() {
   };
 
   if (!user) {
-    return <LoginView onLogin={handleLogin} />;
+    return <LoginView onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
   return (

@@ -62,7 +62,9 @@ Query it with `read_table(name, where=..., columns=...)` — e.g.
 `POST /api/v1/login` verifies credentials against the `users` table
 (PBKDF2-HMAC-SHA256, 600k iterations, stdlib-only) and issues a 12 h opaque
 bearer token stored hashed in `sessions`. `GET /api/v1/me` validates,
-`POST /api/v1/logout` revokes. Default `admin` / `admin123` comes from
+`POST /api/v1/logout` revokes. `POST /api/v1/register` creates accounts
+(username 3–32 chars, password min 8, `409` on duplicates) and signs the new
+user straight in. Default `admin` / `admin123` comes from
 `AUTH_USER` / `AUTH_PASS` and is seeded on first login.
 
 ## Run

@@ -64,6 +64,13 @@ Requires `Authorization: Bearer <token>`. Returns `{ "username" }`.
 Requires `Authorization: Bearer <token>` (also succeeds without one).
 Revokes the session token. Returns `{ "status": "ok" }`.
 
+### `POST /register`
+Body: `{ "username", "password" }`. Creates a new account — username must be
+3–32 chars (`A-Z a-z 0-9 _ . -`), password minimum 8 chars (validated with
+`422` on violation). Returns `201` with a signed-in session
+`{ "token", "username", "expires_at" }`, exactly like login.
+`409` when the username is taken.
+
 ### `POST /predict`
 Body: `PredictRequest`. Returns the full prediction payload:
 

@@ -134,3 +134,40 @@ def test_me_and_logout_flow(isolated_auth):
 def test_me_no_token(isolated_auth):
     assert client.get("/api/v1/me").status_code == 401
     assert client.get("/api/v1/me", headers={"Authorization": "Bearer bogus"}).status_code == 401
+
+
+def test_register_new_user_auto_login(isolated_auth):
+    r = client.post("/api/v1/register",
+                    json={"username": "operator1", "password": "s3cure-pass"})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["username"] == "operator1"
+    assert body["token"]
+    me = client.get("/api/v1/me",
+                    headers={"Authorization": f"Bearer {body['token']}"})
+    assert me.status_code == 200
+    assert me.json()["username"] == "operator1"
+    # and the new user can sign in with a password check
+    again = client.post("/api/v1/login",
+                        json={"username": "operator1", "password": "s3cure-pass"})
+    assert again.status_code == 200
+
+
+def test_register_duplicate_username(isolated_auth):
+    client.post("/api/v1/register",
+                json={"username": "operator1", "password": "s3cure-pass"})
+    r = client.post("/api/v1/register",
+                    json={"username": "operator1", "password": "other-pass"})
+    assert r.status_code == 409
+
+
+def test_register_weak_password_rejected(isolated_auth):
+    r = client.post("/api/v1/register",
+                    json={"username": "operator1", "password": "short"})
+    assert r.status_code == 422
+
+
+def test_register_bad_username_rejected(isolated_auth):
+    r = client.post("/api/v1/register",
+                    json={"username": "no spaces!", "password": "s3cure-pass"})
+    assert r.status_code == 422

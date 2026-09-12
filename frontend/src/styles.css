@@ -903,6 +903,30 @@ input[type="number"] { width: 90px; }
   color: var(--muted);
 }
 .login-foot { color: var(--muted); font-size: 10.5px; margin: 4px 0 0; text-align: center; }
+.auth-tabs {
+  display: flex;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 3px;
+}
+.auth-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+}
+.auth-tab.active {
+  background: rgba(76, 194, 255, 0.14);
+  color: var(--accent);
+}
 
 .user-name { font-size: 12px; color: var(--text); font-weight: 600; }
 

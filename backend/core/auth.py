@@ -102,6 +102,35 @@ def authenticate(username: str, password: str) -> Optional[str]:
     return username if verify_password(password, row[0]) else None
 
 
+class UsernameTakenError(ValueError):
+    """Raised when registering a username that already exists."""
+
+
+def register_user(username: str, password: str) -> str:
+    """Create a new user with a hashed password. Returns the username.
+
+    Raises UsernameTakenError when the name is already registered.
+    """
+    username = username.strip()
+    _ensure_tables()
+    con = storage.connect()
+    try:
+        exists = con.execute(
+            "SELECT 1 FROM users WHERE username = ?",
+            [username],
+        ).fetchone()
+        if exists is not None:
+            raise UsernameTakenError(f"Username already registered: {username}")
+        con.execute(
+            "INSERT INTO users (username, password_hash, created_at) "
+            "VALUES (?, ?, ?)",
+            [username, hash_password(password), _utcnow()],
+        )
+    finally:
+        con.close()
+    return username
+
+
 def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
