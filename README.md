@@ -72,16 +72,40 @@ npm run dev                            # dashboard (Vite proxies /api -> :8000)
 
 ## Repository layout
 
-| Path | Purpose |
-|---|---|
-| `api/` | Vercel serverless entrypoint (`index.py`, Mangum ASGI adapter) |
-| `backend/` | FastAPI app: `main.py`, `api/routes.py`, `schemas/models.py` |
-| `core/` | Data, features, graph, models, simulation, explanation, routing engine |
-| `frontend/` | React 18 + Vite dashboard |
-| `tests/` | `test_api.py` (HTTP), `test_core.py` (units), `test_engine.py` (slow E2E) |
-| `artifacts/` | Trained model artifacts + `evaluation.json` (generated, git-ignored) |
-| `data/` | Synthetic data (generated, git-ignored) |
-| `docs/` | Architecture, API, deployment and model documentation |
+Two top-level stacks plus shared repo files:
+
+```
+supply-chain-risk-ai/
+├── frontend/     # React 18 + Vite dashboard  -> frontend/README.md
+└── backend/      # FastAPI backend (app)      -> backend/README.md
+    + core/       # ML engine (part of backend stack)
+    + api/        # Vercel serverless entrypoint (part of backend stack)
+    + tests/      # backend tests
+```
+
+### Frontend — React (`frontend/`)
+
+React 18 + Vite SPA: route map, risk views, ETA percentiles, simulator,
+explanations, reports. See [frontend/README.md](frontend/README.md).
+
+### Backend — FastAPI (`backend/` + `core/` + `api/` + `tests/`)
+
+FastAPI app (`backend/`), ML engine (`core/`), serverless adapter (`api/`),
+tests (`tests/`). The Python code intentionally stays at repo root so import
+paths (`backend.*`, `core.*`) and the Vercel `api/index.py` entrypoint remain
+stable. See [backend/README.md](backend/README.md).
+
+| Path | Stack | Purpose |
+|---|---|---|
+| `frontend/` | Frontend | React 18 + Vite dashboard |
+| `backend/` | Backend | FastAPI app: `main.py`, `api/routes.py`, `schemas/models.py` |
+| `core/` | Backend | Data, features, graph, models, simulation, explanation, routing engine |
+| `api/` | Backend | Vercel serverless entrypoint (`index.py`, Mangum ASGI adapter) |
+| `tests/` | Backend | `test_api.py` (HTTP), `test_core.py` (units), `test_engine.py` (slow E2E) |
+| `requirements.txt` / `requirements-dev.txt` | Backend | lean prod runtime / full dev stack |
+| `artifacts/` | Backend | Trained model artifacts + `evaluation.json` (generated, git-ignored) |
+| `data/` | Backend | Synthetic data (generated, git-ignored) |
+| `docs/` | Shared | Architecture, API, deployment and model documentation |
 
 Detailed docs:
 
