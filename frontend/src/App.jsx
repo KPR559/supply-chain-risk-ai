@@ -21,7 +21,7 @@ import CriticalCheckpointsView from "./pages/CriticalCheckpointsView.jsx";
 import RiskContributorsView from "./pages/RiskContributorsView.jsx";
 import WhatIfView from "./pages/WhatIfView.jsx";
 import CompareRoutesView from "./pages/CompareRoutesView.jsx";
-import ChartsGraphsView from "./pages/ChartsGraphsView.jsx";
+
 
 const DEFAULT_ROUTE = "suez";
 const DEFAULT_NSIM = 10000;
@@ -37,7 +37,7 @@ const VIEWS = {
   contributors: RiskContributorsView,
   simulator: WhatIfView,
   compare: CompareRoutesView,
-  charts: ChartsGraphsView,
+
 };
 
 export default function App() {
