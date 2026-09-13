@@ -11,7 +11,6 @@ export const NAV_ITEMS = [
   { id: "contributors", label: "Risk Contributors", icon: "◫" },
   { id: "simulator", label: "What-if Simulator", icon: "⬡" },
   { id: "compare", label: "Route Comparison", icon: "⇄" },
-  { id: "charts", label: "Charts & Graphs", icon: "▤" },
 ];
 
 export default function Sidebar({ active = "results", onSelect, user, onLogout, onDeleteAccount }) {

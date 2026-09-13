@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api.js";
+import RootCauseAnalysis from "../components/RootCauseAnalysis.jsx";
 import SummaryCards from "../components/SummaryCards.jsx";
 import MetricsPanel from "../components/MetricsPanel.jsx";
 import TabState from "../components/TabState.jsx";
 
 export default function PredictionResultsView({ data }) {
-  const { prediction, dq, loading, apiError, onRetry } = data;
+  const { prediction, dq, explanation, critical, loading, apiError, onRetry } = data;
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState(null);
 
@@ -32,6 +33,17 @@ export default function PredictionResultsView({ data }) {
           </div>
         </div>
       </div>
+
+      {(critical?.critical_nodes?.length || explanation?.top_factors?.length) && (
+        <section className="panel">
+          <h2>Root Cause Composition</h2>
+          <RootCauseAnalysis
+            critical={critical}
+            explanation={explanation}
+            prediction={prediction}
+          />
+        </section>
+      )}
 
       <TabState
         loading={loading}
