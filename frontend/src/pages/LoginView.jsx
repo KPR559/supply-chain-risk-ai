@@ -33,12 +33,14 @@ export default function LoginView({ onLogin, onRegister }) {
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
   const isSignup = mode === "signup";
 
   const switchMode = (next) => {
     setMode(next);
     setError(null);
+    setSuccess(null);
     setConfirm("");
   };
 
@@ -50,11 +52,22 @@ export default function LoginView({ onLogin, onRegister }) {
     }
     setBusy(true);
     setError(null);
+    setSuccess(null);
     try {
-      const err = isSignup
-        ? await onRegister(username.trim(), password, remember)
-        : await onLogin(username.trim(), password, remember);
-      if (err) setError(err);
+      if (isSignup) {
+        const err = await onRegister(username.trim(), password);
+        if (err) {
+          setError(err);
+        } else {
+          setSuccess("Account created — please sign in.");
+          setMode("signin");
+          setPassword("");
+          setConfirm("");
+        }
+      } else {
+        const err = await onLogin(username.trim(), password, remember);
+        if (err) setError(err);
+      }
     } finally {
       setBusy(false);
     }
@@ -118,6 +131,7 @@ export default function LoginView({ onLogin, onRegister }) {
           </div>
 
           {error && <div className="banner error login-error">{error}</div>}
+          {success && <div className="banner success login-success">{success}</div>}
 
           <label className="login-field">
             <span>Username</span>
@@ -170,8 +184,11 @@ export default function LoginView({ onLogin, onRegister }) {
               Username: 3–32 chars (letters, digits, <code>_ . -</code>) ·
               password: min 8 characters.
             </p>
-          ) : ( 
-            null
+          ) : (
+            <p className="login-hint">
+              Demo credentials — username <code>{DEFAULT_CREDENTIALS.username}</code>
+              {" · "}password <code>{DEFAULT_CREDENTIALS.password}</code>
+            </p>
           )}
 
           <label className="remember-row">

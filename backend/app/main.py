@@ -24,6 +24,14 @@ async def lifespan(app: FastAPI):
         ensure_tables()
     except Exception as e:  # pragma: no cover - startup must never crash on this
         log.warning(f"auth tables not ensured at startup: {e}")
+    # Warm the ML engine so the first prediction doesn't pay cold-start cost.
+    try:
+        from backend.core.predictor import get_engine
+
+        get_engine().ensure_ready()
+        log.info("ml engine ready")
+    except Exception as e:  # pragma: no cover - artifacts may be missing in CI
+        log.warning(f"ml engine warmup skipped: {e}")
     yield
     log.info("backend stopped")
 

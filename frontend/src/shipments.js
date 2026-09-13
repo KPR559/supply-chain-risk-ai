@@ -98,7 +98,7 @@ function drop(key) {
 
 export function loadShipments(username) {
   const stored = read(userKey(STORE_KEY, username));
-  if (Array.isArray(stored) && stored.length > 0) return stored;
+  if (stored !== null) return Array.isArray(stored) ? stored : [];
   const legacy = read(STORE_KEY);
   if (Array.isArray(legacy) && legacy.length > 0) {
     // Adopt the old shared registry once, then drop it.
@@ -106,7 +106,12 @@ export function loadShipments(username) {
     drop(STORE_KEY);
     return legacy;
   }
-  return SEED.map((s) => ({ ...s }));
+  // New accounts start empty. Only the default admin is seeded with demo data
+  // so the dashboard isn't blank on first ever run.
+  if (username && username.toLowerCase() === "admin") {
+    return SEED.map((s) => ({ ...s }));
+  }
+  return [];
 }
 
 export function saveShipments(list, username) {

@@ -177,12 +177,9 @@ export default function App() {
     }
   };
 
-  const handleRegister = async (username, password, remember) => {
+  const handleRegister = async (username, password) => {
     try {
-      const res = await api.register(username, password);
-      saveSession(res.username || username, res.token, remember);
-      setUser(res.username || username);
-      setToken(res.token);
+      await api.register(username, password);
       return null;
     } catch (e) {
       return e.message || "Sign-up failed. Is the API running?";
