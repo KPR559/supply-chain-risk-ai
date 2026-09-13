@@ -6,13 +6,16 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.app.schemas.models import (CompareRoutesRequest, LoginRequest, PredictRequest,
-                                     RegisterRequest, ScenarioAdjustment, SimulateRequest,
+from backend.app.schemas.models import (ChangePasswordRequest, CompareRoutesRequest,
+                                     ForgotRequest, LoginRequest, PredictRequest,
+                                     RegisterRequest, ResetRequest,
+                                     ScenarioAdjustment, SimulateRequest,
                                      WhatIfRequest)
 from backend.core import storage
-from backend.core.auth import (UsernameTakenError, authenticate, create_session,
-                               delete_user, register_user, revoke_token,
-                               verify_token)
+from backend.core.auth import (UsernameTakenError, authenticate, change_password,
+                               check_rate_limit, create_reset_token, delete_user,
+                               issue_token_pair, register_user, reset_password_with_token,
+                               revoke_token, verify_refresh_token, verify_token)
 from backend.core.config import get_settings
 from backend.core.graph import topology
 from backend.core.logging_util import get_logger, log_with
@@ -75,38 +78,88 @@ def health() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _bearer_token(request: Request) -> Optional[str]:
+    # Prefer Authorization header, fall back to HttpOnly refresh cookie for /refresh
     auth = request.headers.get("authorization", "")
     scheme, _, token = auth.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        return None
-    return token
+    if scheme.lower() == "bearer" and token:
+        return token
+    ck = request.cookies.get("refresh_token")
+    if ck:
+        return ck
+    return None
+
+
+def _client_ip(request: Request) -> str:
+    # Vercel / proxy aware
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _issue_pair_response(username: str, status_code: int = 200):
+    pair = issue_token_pair(username)
+    s = get_settings()
+    # HttpOnly refresh cookie (7d), SameSite Lax so top-level navigation works
+    from fastapi.responses import JSONResponse
+    resp = JSONResponse({
+        "token": pair["access_token"],
+        "access_token": pair["access_token"],
+        "refresh_token": pair["refresh_token"],
+        "username": username,
+        "expires_at": pair.get("expires_at"),
+    }, status_code=status_code)
+    resp.set_cookie(
+        "refresh_token", pair["refresh_token"],
+        httponly=True, samesite="lax", secure=False,  # secure True needs HTTPS; keep False for local
+        max_age=s.auth_refresh_ttl_days * 86400, path="/api/v1",
+    )
+    return resp
 
 
 @router.post("/login")
-def login(req: LoginRequest) -> Dict[str, Any]:
+def login(req: LoginRequest, request: Request) -> Dict[str, Any]:
+    if not check_rate_limit(f"login:{_client_ip(request)}"):
+        raise HTTPException(status_code=429, detail="Too many attempts, try again shortly")
     username = authenticate(req.username.strip(), req.password)
     if username is None:
         raise HTTPException(status_code=401, detail="Invalid username or password")
-    token, expires_at = create_session(username)
-    return {"token": token, "username": username,
-            "expires_at": expires_at.isoformat()}
+    return _issue_pair_response(username)
 
 
 @router.post("/register", status_code=201)
-def register(req: RegisterRequest) -> Dict[str, Any]:
+def register(req: RegisterRequest, request: Request) -> Dict[str, Any]:
+    if not check_rate_limit(f"register:{_client_ip(request)}"):
+        raise HTTPException(status_code=429, detail="Too many attempts, try again shortly")
     try:
         username = register_user(req.username, req.password)
     except UsernameTakenError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    token, expires_at = create_session(username)
-    return {"token": token, "username": username,
-            "expires_at": expires_at.isoformat()}
+    return _issue_pair_response(username, status_code=201)
 
 
 @router.post("/logout")
 def logout(request: Request) -> Dict[str, Any]:
-    revoke_token(_bearer_token(request))
-    return {"status": "ok"}
+    token = _bearer_token(request)
+    # try to find user via either token type to revoke all their sessions
+    username = verify_token(token) or verify_refresh_token(token)
+    if username:
+        # revoke all sessions for user (clean logout)
+        from backend.core import auth as auth_mod
+        con = auth_mod.storage.connect()
+        try:
+            con.execute("DELETE FROM sessions WHERE username = ?", [username])
+        finally:
+            con.close()
+    else:
+        revoke_token(token)
+        from backend.core.auth import revoke_refresh_token
+        revoke_refresh_token(token)
+    # clear refresh cookie
+    from fastapi.responses import JSONResponse
+    resp = JSONResponse({"status": "ok"})
+    resp.delete_cookie("refresh_token", path="/api/v1")
+    return resp
 
 
 @router.get("/me")
@@ -117,13 +170,67 @@ def me(request: Request) -> Dict[str, Any]:
     return {"username": username}
 
 
+@router.post("/refresh")
+def refresh(request: Request) -> Dict[str, Any]:
+    token = _bearer_token(request)
+    username = verify_refresh_token(token)
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+    # rotate: revoke old, issue new pair
+    from backend.core.auth import revoke_refresh_token
+    revoke_refresh_token(token)
+    return _issue_pair_response(username)
+
+
+@router.post("/forgot-password")
+def forgot(req: ForgotRequest, request: Request) -> Dict[str, Any]:
+    if not check_rate_limit(f"forgot:{_client_ip(request)}"):
+        raise HTTPException(status_code=429, detail="Too many attempts, try again shortly")
+    try:
+        token, exp = create_reset_token(req.username.strip())
+    except ValueError:
+        # don't reveal whether the user exists
+        return {"status": "ok"}
+    # In production this would email the token; for prototype we return it
+    # so the flow is testable without an email provider.
+    return {"status": "ok", "reset_token": token, "expires_at": exp.isoformat()}
+
+
+@router.post("/reset-password")
+def reset(req: ResetRequest) -> Dict[str, Any]:
+    try:
+        username = reset_password_with_token(req.token, req.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "ok", "username": username}
+
+
+@router.post("/change-password")
+def change_password_route(req: ChangePasswordRequest, request: Request) -> Dict[str, Any]:
+    username = verify_token(_bearer_token(request))
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    try:
+        change_password(username, req.old_password, req.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "ok"}
+
+
 @router.delete("/account")
 def delete_account(request: Request) -> Dict[str, Any]:
     username = verify_token(_bearer_token(request))
     if username is None:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
+    # revoke the presented token too
+    revoke_token(_bearer_token(request))
     delete_user(username)
-    return {"status": "ok", "deleted": username}
+    resp = {"status": "ok", "deleted": username}
+    # clear refresh cookie
+    from fastapi.responses import JSONResponse
+    jr = JSONResponse(resp)
+    jr.delete_cookie("refresh_token", path="/api/v1")
+    return jr
 
 
 # ---------------------------------------------------------------------------

@@ -61,10 +61,11 @@ export function getSession() {
   );
 }
 
-export function saveSession(username, token, remember = true) {
+export function saveSession(username, token, remember = true, refreshToken = null) {
   const payload = JSON.stringify({
     username,
     token,
+    refresh_token: refreshToken,
     at: new Date().toISOString(),
   });
   if (remember) {
@@ -72,6 +73,24 @@ export function saveSession(username, token, remember = true) {
     writeStore(storeOf("localStorage"), payload);
   } else {
     dropStore(storeOf("localStorage"));
+    writeStore(storeOf("sessionStorage"), payload);
+  }
+}
+
+export function updateSessionTokens(token, refreshToken) {
+  const existing = getSession();
+  if (!existing) return;
+  const payload = JSON.stringify({
+    ...existing,
+    token,
+    refresh_token: refreshToken,
+    at: new Date().toISOString(),
+  });
+  // preserve original storage choice
+  const inLocal = readStore(storeOf("localStorage"));
+  if (inLocal && inLocal.username === existing.username) {
+    writeStore(storeOf("localStorage"), payload);
+  } else {
     writeStore(storeOf("sessionStorage"), payload);
   }
 }

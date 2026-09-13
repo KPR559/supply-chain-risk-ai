@@ -94,9 +94,12 @@ def test_unknown_node_404():
 def isolated_auth(tmp_path, monkeypatch):
     from dataclasses import replace
     from backend.core.config import get_settings as real_settings
+    from backend.core.auth import reset_rate_limits
+    reset_rate_limits()
     fake = replace(real_settings(), project_root=tmp_path, data_dir=tmp_path)
     monkeypatch.setattr("backend.app.api.routes.get_settings", lambda: fake)
     monkeypatch.setattr("backend.core.storage.get_settings", lambda: fake)
+    monkeypatch.setattr("backend.core.auth.get_settings", lambda: fake)
     return fake
 
 

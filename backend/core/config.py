@@ -106,6 +106,12 @@ class Settings:
 
     auth_user: str = field(default_factory=lambda: _env("AUTH_USER", "admin"))
     auth_pass: str = field(default_factory=lambda: _env("AUTH_PASS", "admin123"))
+    auth_secret: str = field(default_factory=lambda: _env("AUTH_SECRET", "dev-secret-change-in-production"))
+    auth_access_ttl_min: int = field(default_factory=lambda: _env_int("AUTH_ACCESS_TTL_MIN", 15))
+    auth_refresh_ttl_days: int = field(default_factory=lambda: _env_int("AUTH_REFRESH_TTL_DAYS", 7))
+    auth_reset_ttl_min: int = field(default_factory=lambda: _env_int("AUTH_RESET_TTL_MIN", 60))
+
+    cors_origins: str = field(default_factory=lambda: _env("CORS_ORIGINS", "*"))
 
     api_host: str = field(default_factory=lambda: _env("API_HOST", "0.0.0.0"))
     api_port: int = field(default_factory=lambda: _env_int("API_PORT", 8000))

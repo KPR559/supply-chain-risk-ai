@@ -2,8 +2,8 @@
 
 - Passwords: PBKDF2-HMAC-SHA256 (600k iterations), per-user random salt,
   stdlib-only. Stored as ``pbkdf2_sha256$<iters>$<salt_hex>$<hash_hex>``.
-- Sessions: opaque bearer tokens (``secrets.token_urlsafe``), stored as
-  SHA-256 digests with a 12 h expiry. No JWT library needed.
+- Sessions: JWT access (15m) + JWT refresh (7d, stored hashed, HttpOnly cookie).
+  Old opaque tokens are still accepted as a fallback until they expire.
 - The default admin (``AUTH_USER`` / ``AUTH_PASS``) is seeded on first login
   attempt when missing, so a fresh database always has a way in.
 """
@@ -12,18 +12,49 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
+
+import jwt as pyjwt
 
 from backend.core.config import get_settings
 from backend.core import storage
 
 _ITERATIONS = 600_000
-_SESSION_TTL_HOURS = 12
+_SESSION_TTL_HOURS = 12  # legacy opaque sessions
+_JWT_ALG = "HS256"
 
 
 def _utcnow() -> datetime:
     return datetime.utcnow()
+
+
+def _jwt_secret() -> str:
+    return get_settings().auth_secret
+
+
+def _jwt_issue(username: str, ttl: timedelta, typ: str) -> str:
+    now_ts = int(time.time())
+    payload = {
+        "sub": username,
+        "iat": now_ts,
+        "exp": now_ts + int(ttl.total_seconds()),
+        "jti": secrets.token_hex(12),
+        "type": typ,
+    }
+    return pyjwt.encode(payload, _jwt_secret(), algorithm=_JWT_ALG)
+
+
+def _jwt_verify(token: str, expected_type: str) -> Optional[str]:
+    try:
+        data = pyjwt.decode(token, _jwt_secret(), algorithms=[_JWT_ALG])
+    except pyjwt.PyJWTError:
+        return None
+    if data.get("type") != expected_type:
+        return None
+    return data.get("sub")
 
 
 def hash_password(password: str) -> str:
@@ -47,7 +78,7 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def ensure_tables() -> None:
-    """Create users/sessions tables if missing. Called once at app startup;
+    """Create users/sessions/reset_tokens tables if missing. Called once at app startup;
     write paths below also call it so ad-hoc use never hits a missing table.
     """
     con = storage.connect()
@@ -60,6 +91,12 @@ def ensure_tables() -> None:
         )
         con.execute(
             "CREATE TABLE IF NOT EXISTS sessions ("
+            "token_hash VARCHAR PRIMARY KEY, "
+            "username VARCHAR, "
+            "expires_at TIMESTAMP)"
+        )
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS reset_tokens ("
             "token_hash VARCHAR PRIMARY KEY, "
             "username VARCHAR, "
             "expires_at TIMESTAMP)"
@@ -155,15 +192,62 @@ def create_session(username: str,
     return token, expires_at
 
 
+# ---------------------------------------------------------------------------
+# JWT issuance
+# ---------------------------------------------------------------------------
+
+def issue_token_pair(username: str) -> Dict[str, str]:
+    s = get_settings()
+    access = _jwt_issue(username, timedelta(minutes=s.auth_access_ttl_min), "access")
+    refresh = _jwt_issue(username, timedelta(days=s.auth_refresh_ttl_days), "refresh")
+    # persist both for revocation (access short-lived, refresh long-lived)
+    ensure_tables()
+    now = _utcnow()
+    access_exp = now + timedelta(minutes=s.auth_access_ttl_min)
+    refresh_exp = now + timedelta(days=s.auth_refresh_ttl_days)
+    con = storage.connect()
+    try:
+        con.execute(
+            "INSERT INTO sessions (token_hash, username, expires_at) VALUES (?, ?, ?)",
+            [_token_hash(access), username, access_exp],
+        )
+        con.execute(
+            "INSERT INTO sessions (token_hash, username, expires_at) VALUES (?, ?, ?)",
+            [_token_hash(refresh), username, refresh_exp],
+        )
+    finally:
+        con.close()
+    return {"access_token": access, "refresh_token": refresh, "expires_at": access_exp.isoformat()}
+
+
 def verify_token(token: Optional[str]) -> Optional[str]:
     """Return the username for a live session token, else None.
 
-    Hot path (every session check): no DDL here — tables are ensured at app
-    startup. Any database error resolves to None (unknown session), never an
-    exception, so transient DB hiccups can't crash requests.
+    Accepts both JWT access tokens and legacy opaque tokens.
+    JWTs are verified cryptographically and then checked for revocation
+    (presence in sessions). Legacy path hits DB but never raises.
     """
     if not token:
         return None
+    # JWT-like? (header.payload.signature)
+    if token.count(".") == 2:
+        sub = _jwt_verify(token, "access")
+        if sub is not None:
+            try:
+                con = storage.connect()
+                try:
+                    row = con.execute(
+                        "SELECT 1 FROM sessions WHERE token_hash = ?",
+                        [_token_hash(token)],
+                    ).fetchone()
+                finally:
+                    con.close()
+            except Exception:
+                return None
+            return sub if row is not None else None
+        # JWT present but invalid/expired — do not fall through to legacy
+        return None
+    # legacy opaque fallback
     try:
         con = storage.connect()
         try:
@@ -184,6 +268,27 @@ def verify_token(token: Optional[str]) -> Optional[str]:
     return username
 
 
+def verify_refresh_token(token: Optional[str]) -> Optional[str]:
+    if not token:
+        return None
+    sub = _jwt_verify(token, "refresh")
+    if sub is None:
+        return None
+    # must still be present (not revoked)
+    try:
+        con = storage.connect()
+        try:
+            row = con.execute(
+                "SELECT 1 FROM sessions WHERE token_hash = ?",
+                [_token_hash(token)],
+            ).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        return None
+    return sub if row is not None else None
+
+
 def revoke_token(token: Optional[str]) -> None:
     if not token:
         return
@@ -200,6 +305,69 @@ def revoke_token(token: Optional[str]) -> None:
         pass
 
 
+def revoke_refresh_token(token: Optional[str]) -> None:
+    revoke_token(token)
+
+
+# ---------------------------------------------------------------------------
+# Password reset / change
+# ---------------------------------------------------------------------------
+
+def create_reset_token(username: str) -> Tuple[str, datetime]:
+    ensure_tables()
+    # must be a known user
+    con = storage.connect()
+    try:
+        exists = con.execute("SELECT 1 FROM users WHERE username = ?", [username]).fetchone()
+        if exists is None:
+            raise ValueError("Unknown user")
+    finally:
+        con.close()
+    raw = secrets.token_urlsafe(32)
+    exp = _utcnow() + timedelta(minutes=get_settings().auth_reset_ttl_min)
+    con = storage.connect()
+    try:
+        con.execute("DELETE FROM reset_tokens WHERE username = ?", [username])
+        con.execute("INSERT INTO reset_tokens (token_hash, username, expires_at) VALUES (?, ?, ?)",
+                    [_token_hash(raw), username, exp])
+    finally:
+        con.close()
+    return raw, exp
+
+
+def reset_password_with_token(token: str, new_password: str) -> str:
+    th = _token_hash(token)
+    con = storage.connect()
+    try:
+        row = con.execute("SELECT username, expires_at FROM reset_tokens WHERE token_hash = ?", [th]).fetchone()
+        if row is None:
+            raise ValueError("Invalid or expired reset token")
+        username, exp = row
+        if exp is not None and exp < _utcnow():
+            con.execute("DELETE FROM reset_tokens WHERE token_hash = ?", [th])
+            raise ValueError("Reset token expired")
+        con.execute("UPDATE users SET password_hash = ? WHERE username = ?",
+                    [hash_password(new_password), username])
+        con.execute("DELETE FROM reset_tokens WHERE token_hash = ?", [th])
+        # revoke all sessions so old tokens die
+        con.execute("DELETE FROM sessions WHERE username = ?", [username])
+        return username
+    finally:
+        con.close()
+
+
+def change_password(username: str, old_password: str, new_password: str) -> None:
+    if authenticate(username, old_password) is None:
+        raise ValueError("Current password is incorrect")
+    con = storage.connect()
+    try:
+        con.execute("UPDATE users SET password_hash = ? WHERE username = ?",
+                    [hash_password(new_password), username])
+        con.execute("DELETE FROM sessions WHERE username = ?", [username])
+    finally:
+        con.close()
+
+
 def delete_user(username: str) -> bool:
     """Delete a user and all their sessions. Returns True when removed."""
     ensure_tables()
@@ -211,7 +379,35 @@ def delete_user(username: str) -> bool:
         if exists is None:
             return False
         con.execute("DELETE FROM sessions WHERE username = ?", [username])
+        con.execute("DELETE FROM reset_tokens WHERE username = ?", [username])
         con.execute("DELETE FROM users WHERE username = ?", [username])
         return True
     finally:
         con.close()
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting (in-memory, per-IP)
+# ---------------------------------------------------------------------------
+
+_rate_buckets: Dict[str, List[float]] = defaultdict(list)
+_RATE_LIMIT = 5
+_RATE_WINDOW_S = 60.0
+
+
+def check_rate_limit(key: str) -> bool:
+    """Return True when allowed, False when the 5/min budget is exceeded."""
+    now = time.monotonic()
+    bucket = _rate_buckets[key]
+    # drop outside window
+    cutoff = now - _RATE_WINDOW_S
+    while bucket and bucket[0] < cutoff:
+        bucket.pop(0)
+    if len(bucket) >= _RATE_LIMIT:
+        return False
+    bucket.append(now)
+    return True
+
+
+def reset_rate_limits() -> None:
+    _rate_buckets.clear()

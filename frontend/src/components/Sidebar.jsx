@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { api } from "../api.js";
+import { getSession } from "../auth.js";
 
 export const NAV_ITEMS = [
   { id: "results", label: "Prediction Results", icon: "◉" },
@@ -18,6 +20,44 @@ export default function Sidebar({ active = "results", onSelect, user, onLogout, 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [delError, setDelError] = useState(null);
+  const [showChange, setShowChange] = useState(false);
+  const [oldPw, setOldPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [changeError, setChangeError] = useState(null);
+  const [changeSuccess, setChangeSuccess] = useState(null);
+  const [changeBusy, setChangeBusy] = useState(false);
+
+  const handleChangePw = async (e) => {
+    e.preventDefault();
+    if (newPw !== confirmPw) {
+      setChangeError("New passwords do not match.");
+      return;
+    }
+    if (newPw.length < 8) {
+      setChangeError("New password must be at least 8 characters.");
+      return;
+    }
+    setChangeBusy(true);
+    setChangeError(null);
+    setChangeSuccess(null);
+    try {
+      const sess = getSession();
+      const token = sess?.token;
+      await api.changePassword(oldPw, newPw, token);
+      setChangeSuccess("Password changed — please sign in again.");
+      setOldPw("");
+      setNewPw("");
+      setConfirmPw("");
+      setTimeout(() => {
+        if (onLogout) onLogout();
+      }, 1200);
+    } catch (err) {
+      setChangeError(err.message || "Change failed.");
+    } finally {
+      setChangeBusy(false);
+    }
+  };
 
   const doDelete = async () => {
     setBusy(true);
@@ -70,6 +110,52 @@ export default function Sidebar({ active = "results", onSelect, user, onLogout, 
           <button className="btn ghost logout-btn-full" onClick={onLogout} title="Sign out">
             ⏻ Log out
           </button>
+        )}
+        {user && !showChange && (
+          <button
+            className="change-password-link"
+            onClick={() => setShowChange(true)}
+            title="Change your password"
+          >
+            <span className="nav-icon">🔑</span>
+            <span>Change password</span>
+          </button>
+        )}
+        {showChange && (
+          <form className="change-pw-form" onSubmit={handleChangePw}>
+            <h4 className="change-pw-title">Change password</h4>
+            {changeError && <div className="banner error login-error">{changeError}</div>}
+            {changeSuccess && <div className="banner success login-success">{changeSuccess}</div>}
+            <label className="login-field">
+              <span>Current password</span>
+              <input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} placeholder="••••••••" />
+            </label>
+            <label className="login-field">
+              <span>New password</span>
+              <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="••••••••" />
+            </label>
+            <label className="login-field">
+              <span>Confirm new password</span>
+              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="••••••••" />
+            </label>
+            <div className="delete-confirm-actions">
+              <button className="btn mini-btn" type="submit" disabled={changeBusy}>
+                {changeBusy ? "Saving…" : "Save"}
+              </button>
+              <button
+                className="btn ghost mini-btn"
+                type="button"
+                onClick={() => {
+                  setShowChange(false);
+                  setChangeError(null);
+                  setChangeSuccess(null);
+                }}
+                disabled={changeBusy}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         )}
         {onDeleteAccount &&
           (confirming ? (

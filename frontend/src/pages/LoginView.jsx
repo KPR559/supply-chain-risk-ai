@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { DEFAULT_CREDENTIALS } from "../auth.js";
+import { api } from "../api.js";
 
 const HIGHLIGHTS = [
   {
@@ -34,6 +35,14 @@ export default function LoginView({ onLogin, onRegister }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotUser, setForgotUser] = useState("");
+  const [forgotToken, setForgotToken] = useState("");
+  const [forgotNewPw, setForgotNewPw] = useState("");
+  const [forgotConfirm, setForgotConfirm] = useState("");
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotError, setForgotError] = useState(null);
+  const [forgotSuccess, setForgotSuccess] = useState(null);
 
   const isSignup = mode === "signup";
 
@@ -42,6 +51,58 @@ export default function LoginView({ onLogin, onRegister }) {
     setError(null);
     setSuccess(null);
     setConfirm("");
+    setShowForgot(false);
+    setForgotError(null);
+    setForgotSuccess(null);
+  };
+
+  const handleForgotRequest = async (e) => {
+    e.preventDefault();
+    setForgotBusy(true);
+    setForgotError(null);
+    setForgotSuccess(null);
+    try {
+      const res = await api.forgotPassword(forgotUser.trim());
+      if (res.reset_token) {
+        setForgotToken(res.reset_token);
+        setForgotSuccess("Reset token generated — copy it and set a new password below.");
+      } else {
+        setForgotSuccess("If the account exists, a reset token was generated.");
+      }
+    } catch (err) {
+      if (err.status === 429) setForgotError("Too many attempts, please wait a minute.");
+      else setForgotError(err.message || "Failed to request reset.");
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (forgotNewPw !== forgotConfirm) {
+      setForgotError("Passwords do not match.");
+      return;
+    }
+    if (forgotNewPw.length < 8) {
+      setForgotError("New password must be at least 8 characters.");
+      return;
+    }
+    setForgotBusy(true);
+    setForgotError(null);
+    try {
+      await api.resetPassword(forgotToken.trim(), forgotNewPw);
+      setForgotSuccess("Password reset — please sign in with your new password.");
+      setForgotToken("");
+      setForgotNewPw("");
+      setForgotConfirm("");
+      setShowForgot(false);
+      setMode("signin");
+      setSuccess("Password reset — please sign in.");
+    } catch (err) {
+      setForgotError(err.message || "Reset failed.");
+    } finally {
+      setForgotBusy(false);
+    }
   };
 
   const submit = async (e) => {
@@ -203,6 +264,73 @@ export default function LoginView({ onLogin, onRegister }) {
           <button className="btn login-btn" type="submit" disabled={busy}>
             {busy ? (isSignup ? "Creating account…" : "Signing in…") : isSignup ? "Create account →" : "Sign in →"}
           </button>
+
+          {!isSignup && !showForgot && (
+            <button type="button" className="link-btn" onClick={() => setShowForgot(true)}>
+              Forgot password?
+            </button>
+          )}
+
+          {showForgot && !isSignup && (
+            <div className="forgot-panel">
+              <h3 className="forgot-title">Reset password</h3>
+              <p className="muted" style={{ fontSize: "12px" }}>
+                Enter your username to get a reset token (demo: token is shown here).
+              </p>
+              {forgotError && <div className="banner error login-error">{forgotError}</div>}
+              {forgotSuccess && <div className="banner success login-success">{forgotSuccess}</div>}
+              {!forgotToken ? (
+                <form onSubmit={handleForgotRequest} className="forgot-form">
+                  <label className="login-field">
+                    <span>Username</span>
+                    <input
+                      type="text"
+                      value={forgotUser}
+                      onChange={(e) => setForgotUser(e.target.value)}
+                      placeholder="admin"
+                    />
+                  </label>
+                  <button className="btn" type="submit" disabled={forgotBusy}>
+                    {forgotBusy ? "Requesting…" : "Get reset token"}
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setShowForgot(false)}>
+                    Back to sign in
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleReset} className="forgot-form">
+                  <label className="login-field">
+                    <span>Reset token</span>
+                    <input type="text" value={forgotToken} onChange={(e) => setForgotToken(e.target.value)} />
+                  </label>
+                  <label className="login-field">
+                    <span>New password</span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={forgotNewPw}
+                      onChange={(e) => setForgotNewPw(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </label>
+                  <label className="login-field">
+                    <span>Confirm new password</span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={forgotConfirm}
+                      onChange={(e) => setForgotConfirm(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </label>
+                  <button className="btn" type="submit" disabled={forgotBusy}>
+                    {forgotBusy ? "Resetting…" : "Reset password"}
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setShowForgot(false)}>
+                    Back to sign in
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
 
         </form>
       </main>

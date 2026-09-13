@@ -54,6 +54,20 @@ class RegisterRequest(BaseModel):
                           description="Minimum 8 characters")
 
 
+class ForgotRequest(BaseModel):
+    username: str
+
+
+class ResetRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class GetShipmentResponse(BaseModel):
     shipment_id: str
     origin: str

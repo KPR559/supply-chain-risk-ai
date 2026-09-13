@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
-import { clearSession, getSession, saveSession } from "./auth.js";
+import { clearSession, getSession, saveSession, updateSessionTokens } from "./auth.js";
 import {
   loadSelectedId,
   loadShipments,
@@ -168,11 +168,14 @@ export default function App() {
   const handleLogin = async (username, password, remember) => {
     try {
       const res = await api.login(username, password);
-      saveSession(res.username || username, res.token, remember);
+      const access = res.access_token || res.token;
+      const refresh = res.refresh_token || null;
+      saveSession(res.username || username, access, remember, refresh);
       setUser(res.username || username);
-      setToken(res.token);
+      setToken(access);
       return null;
     } catch (e) {
+      if (e.status === 429) return "Too many attempts, please wait a minute.";
       return e.message || "Sign-in failed. Is the API running?";
     }
   };
@@ -182,14 +185,18 @@ export default function App() {
       await api.register(username, password);
       return null;
     } catch (e) {
+      if (e.status === 429) return "Too many attempts, please wait a minute.";
       return e.message || "Sign-up failed. Is the API running?";
     }
   };
 
   const handleLogout = async () => {
-    if (token) {
+    const sess = getSession();
+    const refresh = sess?.refresh_token;
+    const toRevoke = refresh || token;
+    if (toRevoke) {
       try {
-        await api.logout(token);
+        await api.logout(toRevoke);
       } catch {
         // best effort — session is cleared locally regardless
       }
@@ -225,6 +232,7 @@ export default function App() {
   // Re-validate any restored session against the backend on startup.
   // Only a 401 (unknown/expired token) signs out; network or server errors
   // keep the session so a backend blip never kicks the user to login.
+  // If access token expired, try refresh token automatically.
   useEffect(() => {
     const s = getSession();
     if (!s?.token) {
@@ -243,7 +251,25 @@ export default function App() {
       })
       .catch((e) => {
         if (!alive) return;
-        if (e && e.status === 401) {
+        if (e && e.status === 401 && s.refresh_token) {
+          // try refresh
+          api
+            .refresh(s.refresh_token)
+            .then((res) => {
+              if (!alive) return;
+              const newAccess = res.access_token || res.token;
+              const newRefresh = res.refresh_token || s.refresh_token;
+              updateSessionTokens(newAccess, newRefresh);
+              setUser(res.username || s.username);
+              setToken(newAccess);
+            })
+            .catch(() => {
+              if (!alive) return;
+              clearSession();
+              setUser(null);
+              setToken(null);
+            });
+        } else if (e && e.status === 401) {
           clearSession();
           setUser(null);
           setToken(null);
