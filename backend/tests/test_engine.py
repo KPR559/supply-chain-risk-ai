@@ -6,10 +6,33 @@ everything with plain `pytest`.
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
+from backend.app.main import app
 from backend.core.predictor import get_engine
 
 pytestmark = pytest.mark.slow
+
+
+def test_graphs_endpoint_all_routes():
+    r = TestClient(app).get("/api/v1/graphs")
+    assert r.status_code == 200
+    body = r.json()
+    routes = body["routes"]
+    assert {g["route_id"] for g in routes} == {"suez", "cape", "dubai"}
+    assert body["network"]["nodes"] == 10
+    assert body["network"]["edges"] >= 12
+    for g in routes:
+        assert len(g["nodes"]) == len(g["edges"]) + 1
+        for n in g["nodes"]:
+            assert isinstance(n["lon"], float) and isinstance(n["lat"], float)
+            assert "delay_probability" in n["risk"]
+            assert {"x", "y"} <= set(n["pos"])
+            assert "betweenness" in n["metrics"]
+            assert n["metrics"]["hops_from_origin"] == 0 or n["metrics"]["hops_from_origin"] > 0
+        for e in g["edges"]:
+            assert e["mode"] in {"road", "sea", "port"}
+            assert e["distance_km"] >= 0
 
 
 @pytest.fixture(scope="module")

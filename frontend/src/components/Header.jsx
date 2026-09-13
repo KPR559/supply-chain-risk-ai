@@ -15,9 +15,6 @@ export default function Header({
     <header className="page-header">
       <div className="page-title-block">
         <h1>AI Shipment Resilience & Counterfactual Digital Twin</h1>
-        <p className="sub">
-          Supply Chain Intelligence · Frankfurt → India · Per-node risk · Monte Carlo ETA · What-if & route planning
-        </p>
       </div>
       <div className="header-controls">
         <label className="shipment-select">

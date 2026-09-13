@@ -1,107 +1,413 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import cytoscape from "cytoscape";
 import { api } from "../api.js";
-import { riskColor } from "../utils/helpers.js";
+import { riskColor, riskClass } from "../utils/helpers.js";
 
-export default function RouteMap({ graph: routeId, nodes }) {
-  const [graph, setGraph] = useState(null);
+const SHORT_NAMES = { suez: "Suez", cape: "Cape", dubai: "Dubai" };
+const KIND_LABELS = {
+  origin: "Origin",
+  warehouse: "Hub",
+  canal: "Canal",
+  sea: "Open Sea",
+  transshipment: "Transshipment",
+  port: "Port",
+  customs: "Customs",
+  destination: "Final Destination",
+};
+
+const VIEW_W = 1000;
+const VIEW_H = 460;
+
+const CY_STYLE = [
+  {
+    selector: "node",
+    style: {
+      width: 30,
+      height: 30,
+      "background-opacity": 0.95,
+      label: "data(label)",
+      color: "#7a90ad",
+      "font-size": 10,
+      "font-family": "Inter, system-ui, sans-serif",
+      "text-valign": "bottom",
+      "text-halign": "center",
+      "text-margin-y": 12,
+      "text-wrap": "wrap",
+      "text-max-width": 110,
+      "z-index": 10,
+    },
+  },
+  { selector: "node.risk-low", style: { "background-color": "#26a69a" } },
+  { selector: "node.risk-med", style: { "background-color": "#ffb300" } },
+  { selector: "node.risk-high", style: { "background-color": "#f44336" } },
+  { selector: "node.kind-origin", style: { shape: "round-rectangle", width: 34, height: 34 } },
+  { selector: "node.kind-destination", style: { shape: "star", width: 34, height: 34 } },
+  { selector: "node.kind-customs", style: { shape: "diamond", width: 26, height: 26 } },
+  {
+    selector: "node.halo",
+    style: { label: "", width: 52, height: 52, "background-opacity": 0.18, "z-index": 1 },
+  },
+  {
+    selector: "edge",
+    style: {
+      width: 2.2,
+      "line-color": "#26a69a",
+      "curve-style": "bezier",
+      "line-cap": "round",
+      label: "data(label)",
+      "font-size": 8.5,
+      color: "#7a90ad",
+      "text-background-color": "#0b1524",
+      "text-background-opacity": 0.75,
+      "text-background-padding": 2,
+    },
+  },
+  { selector: "edge.mode-sea", style: { "line-style": "dashed" } },
+  { selector: "edge.mode-port", style: { "line-style": "dotted" } },
+  { selector: "edge.risk-med", style: { "line-color": "#ffb300" } },
+  { selector: "edge.risk-high", style: { "line-color": "#f44336" } },
+  { selector: "edge.route-active", style: { width: 2.4, opacity: 0.85 } },
+  { selector: "edge.route-alt", style: { "line-color": "#3d4d6d", width: 1.5, opacity: 0.35 } },
+];
+
+export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
+  const [routes, setRoutes] = useState([]);
   const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState({});
+  const [hover, setHover] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const wrapRef = useRef(null);
+  const cyRef = useRef(null);
+  const sizeRef = useRef({ width: 800, height: 460 });
 
   useEffect(() => {
-    if (!routeId) return;
     let alive = true;
-    setFailed(false);
-    api
-      .graph(routeId)
-      .then((g) => alive && setGraph(g))
-      .catch(() => alive && (setGraph(null), setFailed(true)));
+    (async () => {
+      try {
+        const g = await api.graphs();
+        if (!alive) return;
+        setRoutes(g.routes || []);
+        setVisible(Object.fromEntries((g.routes || []).map((r) => [r.route_id, true])));
+      } catch (e) {
+        try {
+          const list = await Promise.all(["suez", "cape", "dubai"].map((rid) => api.graph(rid)));
+          if (!alive) return;
+          setRoutes(list);
+          setVisible(Object.fromEntries(list.map((r) => [r.route_id, true])));
+        } catch (e2) {
+          if (alive) setFailed(true);
+        }
+      }
+    })();
     return () => {
       alive = false;
     };
-  }, [routeId]);
+  }, []);
 
-  if (failed && !graph?.nodes?.length) {
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const cy = cytoscape({
+      container: wrapRef.current,
+      boxSelectionEnabled: false,
+      autoungrabify: true,
+      autounselectify: true,
+      minZoom: 0.4,
+      maxZoom: 3,
+      wheelSensitivity: 0.2,
+    });
+    cy.style(CY_STYLE);
+    cy.on("tap", (e) => {
+      if (e.target === cy) setSelected(null);
+    });
+    cy.on("tap", "node", (e) => {
+      const id = e.target.id();
+      if (id.startsWith("halo-")) return;
+      setSelected((prev) => (prev === id ? null : id));
+    });
+    cy.on("mouseover", "node", (e) => {
+      const n = e.target;
+      if (n.id().startsWith("halo-")) return;
+      setHover({ kind: "node", nid: n.id(), pos: n.renderedPosition() });
+    });
+    cy.on("mouseover", "edge", (e) => {
+      const ed = e.target;
+      setHover({
+        kind: "edge",
+        src: ed.data("srcLabel"),
+        dst: ed.data("dstLabel"),
+        mode: ed.data("mode"),
+        distance_km: ed.data("distance_km"),
+        baseline_days: ed.data("baseline_days"),
+        pos: ed.renderedPosition(),
+      });
+    });
+    cy.on("mouseout", "node,edge", () => setHover(null));
+    cyRef.current = cy;
+    const onResize = () => {
+      if (wrapRef.current) {
+        const r = wrapRef.current.getBoundingClientRect();
+        sizeRef.current = { width: r.width, height: r.height };
+      }
+    };
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      cy.destroy();
+      cyRef.current = null;
+    };
+  }, []);
+
+  const merged = useMemo(() => {
+    const m = {};
+    for (const r of routes) {
+      for (const n of r.nodes) {
+        m[n.node_id] = {
+          node_id: n.node_id,
+          label: n.label,
+          kind: n.kind,
+          lon: n.lon,
+          lat: n.lat,
+          px: null,
+          py: null,
+          hasPos: Boolean(n.pos && typeof n.pos.x === "number" && typeof n.pos.y === "number"),
+          posx: n.pos?.x,
+          posy: n.pos?.y,
+          prob: n.risk?.delay_probability ?? 0,
+          expectedH: n.risk?.expected_delay_hours,
+          regime: n.risk?.regime,
+          metrics: n.metrics || {},
+        };
+      }
+    }
+    const flat = Object.values(m);
+    const useGeo = flat.some((n) => !n.hasPos);
+    let minLon = Infinity;
+    let maxLon = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    if (useGeo) {
+      for (const n of flat) {
+        minLon = Math.min(minLon, n.lon);
+        maxLon = Math.max(maxLon, n.lon);
+        minLat = Math.min(minLat, n.lat);
+        maxLat = Math.max(maxLat, n.lat);
+      }
+    }
+    const padLon = Math.max((maxLon - minLon) * 0.06, 3);
+    const padLat = Math.max((maxLat - minLat) * 0.08, 3);
+    for (const n of flat) {
+      if (n.hasPos) {
+        n.px = n.posx * VIEW_W;
+        n.py = (1 - n.posy) * VIEW_H;
+      } else {
+        n.px = ((n.lon - minLon + padLon) / (maxLon - minLon + 2 * padLon)) * VIEW_W;
+        n.py = (1 - (n.lat - minLat + padLat) / (maxLat - minLat + 2 * padLat)) * VIEW_H;
+      }
+    }
+    for (const p of nodes) {
+      const base = m[p.node_id];
+      if (!base) continue;
+      m[p.node_id] = {
+        ...base,
+        prob: p.delay_probability ?? base.prob,
+        expectedH: p.expected_delay_hours ?? base.expectedH,
+        regime: p.regime ?? base.regime,
+        p50: p.p50,
+        p80: p.p80,
+        p90: p.p90,
+        congestion: p.congestion,
+        weather: p.weather,
+        conflict: p.conflict,
+      };
+    }
+    return m;
+  }, [routes, nodes]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !routes.length) return;
+    setHover(null);
+    cy.startBatch();
+    cy.elements().remove();
+    for (const [nid, n] of Object.entries(merged)) {
+      if (n.prob >= 0.6) {
+        cy.add({
+          group: "nodes",
+          data: { id: `halo-${nid}` },
+          classes: `halo risk-${riskClass(n.prob)}`,
+          position: { x: n.px, y: n.py },
+        });
+      }
+      const label = n.label + (n.prob >= 0.3 ? `\n${Math.round(n.prob * 100)}%` : "");
+      cy.add({
+        group: "nodes",
+        data: { id: nid, label },
+        classes: `risk-${riskClass(n.prob)} kind-${n.kind}`,
+        position: { x: n.px, y: n.py },
+      });
+    }
+    for (const route of routes) {
+      if (!visible[route.route_id]) continue;
+      const isActive = route.route_id === activeRouteId;
+      for (const e of route.edges) {
+        const a = merged[e.src];
+        const b = merged[e.dst];
+        if (!a || !b) continue;
+        const midProb = (a.prob + b.prob) / 2;
+        cy.add({
+          group: "edges",
+          data: {
+            id: `${route.route_id}:${e.src}>${e.dst}`,
+            source: e.src,
+            target: e.dst,
+            mode: e.mode,
+            distance_km: e.distance_km,
+            baseline_days: e.baseline_days,
+            srcLabel: a.label || e.src,
+            dstLabel: b.label || e.dst,
+            label: isActive ? `~${e.baseline_days}d` : "",
+          },
+          classes: `mode-${e.mode} risk-${riskClass(midProb)} ${isActive ? "route-active" : "route-alt"}`,
+        });
+      }
+    }
+    cy.endBatch();
+    cy.layout({ name: "preset", fit: true, padding: 45 }).run();
+  }, [routes, visible, activeRouteId, merged]);
+
+  const toggle = (rid) => setVisible((v) => ({ ...v, [rid]: !v[rid] }));
+
+  if (failed && !routes.length) {
     return <div className="placeholder">Route map unavailable — the map request failed.</div>;
   }
 
-  if (!graph?.nodes?.length) {
+  if (!routes.length) {
     return <div className="placeholder">Loading route map…</div>;
   }
 
-  const probs = Object.fromEntries((nodes || []).map((n) => [n.node_id, n.delay_probability ?? 0]));
-  const lons = graph.nodes.map((n) => n.lon);
-  const lats = graph.nodes.map((n) => n.lat);
-  const minLon = Math.min(...lons) - 5;
-  const maxLon = Math.max(...lons) + 5;
-  const minLat = Math.min(...lats) - 6;
-  const maxLat = Math.max(...lats) + 6;
-  const W = 760;
-  const H = 320;
-  const sx = (lon) => ((lon - minLon) / (maxLon - minLon)) * W;
-  const sy = (lat) => H - ((lat - minLat) / (maxLat - minLat)) * H;
-  const pos = Object.fromEntries(graph.nodes.map((n) => [n.node_id, { x: sx(n.lon), y: sy(n.lat) }]));
+  const hoverNode = hover?.kind === "node" ? merged[hover.nid] : null;
+  const flip = hover?.pos && hover.pos.x > sizeRef.current.width - 190;
 
   return (
-    <div className="map-container">
-      <svg viewBox={`0 0 ${W} ${H}`} className="map">
-        <defs>
-          <radialGradient id="mapGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#1a2744" />
-            <stop offset="100%" stopColor="#0b1524" />
-          </radialGradient>
-        </defs>
-        <rect x={0} y={0} width={W} height={H} rx={8} fill="url(#mapGlow)" />
-
-        {/* Grid lines */}
-        {[0.2, 0.4, 0.6, 0.8].map((f) => (
-          <line key={`h${f}`} x1={0} y1={H * f} x2={W} y2={H * f} stroke="#1a2744" strokeWidth={0.5} />
-        ))}
-
-        {graph.edges.map((e, i) => {
-          const a = pos[e.src];
-          const b = pos[e.dst];
-          const midProb = ((probs[e.src] ?? 0) + (probs[e.dst] ?? 0)) / 2;
+    <div>
+      <div className="route-toggles">
+        {routes.map((r) => {
+          const on = visible[r.route_id];
+          const isActive = r.route_id === activeRouteId;
+          const dist = Math.round(r.edges.reduce((s, e) => s + e.distance_km, 0));
+          const days = r.edges.reduce((s, e) => s + e.baseline_days, 0);
           return (
-            <line
-              key={i}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              stroke={riskColor(midProb)}
-              strokeWidth={2.5}
-              strokeDasharray="6 4"
-              opacity={0.7}
-            />
+            <button
+              key={r.route_id}
+              className={`route-chip ${on ? "on" : "off"} ${isActive ? "active" : ""}`}
+              onClick={() => toggle(r.route_id)}
+              title={on ? "Hide this route" : "Show this route"}
+            >
+              <span className="chip-dot" />
+              {isActive ? "★ " : ""}
+              {SHORT_NAMES[r.route_id] || r.route_id}
+              <span className="chip-meta">· {dist.toLocaleString()} km · ~{Math.round(days)}d</span>
+            </button>
           );
         })}
-
-        {graph.nodes.map((n) => {
-          const p = probs[n.node_id] ?? 0;
-          const c = riskColor(p);
-          const { x, y } = pos[n.node_id];
-          return (
-            <g key={n.node_id}>
-              <circle cx={x} cy={y} r={14} fill={c} opacity={0.25} />
-              <circle cx={x} cy={y} r={8} fill={c} opacity={0.95} />
-              <circle cx={x} cy={y} r={3.5} fill="#fff" opacity={0.9} />
-              <text x={x} y={y - 18} textAnchor="middle" className="node-label">
-                {n.label}
-              </text>
-              {p >= 0.3 && (
-                <text x={x} y={y + 24} textAnchor="middle" className="node-risk-label">
-                  {Math.round(p * 100)}%
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-      <div className="legend">
-        <span><i style={{ background: riskColor(0.15) }} /> Low Risk (&lt;30%)</span>
-        <span><i style={{ background: riskColor(0.45) }} /> Medium Risk (30–60%)</span>
-        <span><i style={{ background: riskColor(0.75) }} /> High Risk (&gt;60%)</span>
-        <span className="legend-route">{graph.name}</span>
       </div>
+
+      <div className="map-container map-cv" ref={wrapRef}>
+        {hover && (
+          <div
+            className={`map-tip ${flip ? "flip" : ""}`}
+            style={{ left: hover.pos.x, top: hover.pos.y }}
+          >
+            {hoverNode ? (
+              <div>
+                <div className="tip-title">{hoverNode.label}</div>
+                <div className="tip-row">
+                  <span className="tip-kind">{KIND_LABELS[hoverNode.kind] || hoverNode.kind}</span>
+                  <span className={`risk-badge ${riskClass(hoverNode.prob)}`}>{Math.round(hoverNode.prob * 100)}% risk</span>
+                </div>
+                <div className="tip-row">
+                  <span>{hoverNode.expectedH != null ? `Expected +${hoverNode.expectedH}h` : "No delay signal"}</span>
+                  <span>{hoverNode.regime === 1 && "Disrupted"}</span>
+                </div>
+                {hoverNode.metrics?.betweenness != null && (
+                  <div className="tip-row">
+                    <span className="tip-kind">NetworkX</span>
+                    <span>betweenness {hoverNode.metrics.betweenness}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              hover.kind === "edge" && (
+                <div>
+                  <div className="tip-title">{hover.src} → {hover.dst}</div>
+                  <div className="tip-row">
+                    <span className="tip-kind">{hover.mode}</span>
+                    <span>{Math.round(hover.distance_km).toLocaleString()} km</span>
+                  </div>
+                  <div className="tip-row">
+                    <span>~{hover.baseline_days}d baseline</span>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="legend">
+        <span><i style={{ background: riskColor(0.15) }} /> Low (&lt;30%)</span>
+        <span><i style={{ background: riskColor(0.45) }} /> Medium (30–60%)</span>
+        <span><i style={{ background: riskColor(0.75) }} /> High (&gt;60%)</span>
+        <span className="legend-mode solid">road</span>
+        <span className="legend-mode dashed">sea</span>
+        <span className="legend-mode dotted">port</span>
+        <span className="legend-hint">layout: NetworkX ↗ Cytoscape.js · scroll to zoom · click a node to inspect</span>
+      </div>
+
+      {selected && merged[selected] && (
+        <div className="node-detail">
+          <div className="node-detail-head">
+            <div>
+              <span className="view-title">{merged[selected].label}</span>
+              <span className="tip-kind">{KIND_LABELS[merged[selected].kind] || merged[selected].kind}</span>
+            </div>
+            <button className="icon-btn" onClick={() => setSelected(null)} aria-label="Close">×</button>
+          </div>
+          <div className="metric-strip">
+            {[
+              ["Delay prob.", merged[selected].prob != null ? `${Math.round(merged[selected].prob * 100)}%` : "—"],
+              ["Expected delay", merged[selected].expectedH != null ? `+${merged[selected].expectedH}h` : "—"],
+              ["P50 / P80 / P90", [merged[selected].p50, merged[selected].p80, merged[selected].p90].some((v) => v != null) ? `${merged[selected].p50 ?? "?"} / ${merged[selected].p80 ?? "?"} / ${merged[selected].p90 ?? "?"}h` : "—"],
+              ["Congestion", merged[selected].congestion != null ? merged[selected].congestion.toFixed(2) : "—"],
+              ["Weather", merged[selected].weather != null ? merged[selected].weather.toFixed(2) : "—"],
+              ["Conflict", merged[selected].conflict != null ? merged[selected].conflict.toFixed(2) : "—"],
+              ["Regime", merged[selected].regime === 1 ? "Disrupted" : merged[selected].regime === 0 ? "Stable" : "—"],
+            ].map(([k, v]) => (
+              <div key={k} className="metric-cell">
+                <div className="metric-label">{k}</div>
+                <div className="metric-value">{v}</div>
+              </div>
+            ))}
+          </div>
+          {merged[selected].metrics && (
+            <div className="metric-strip" style={{ marginTop: 6 }}>
+              {[
+                ["Betweenness", merged[selected].metrics.betweenness ?? "—"],
+                ["Closeness", merged[selected].metrics.closeness ?? "—"],
+                ["Degree", merged[selected].metrics.degree ?? "—"],
+                ["Hops from origin", merged[selected].metrics.hops_from_origin ?? "—"],
+                ["Hops to dest", merged[selected].metrics.hops_to_dest ?? "—"],
+              ].map(([k, v]) => (
+                <div key={k} className="metric-cell">
+                  <div className="metric-label">{k} · NetworkX</div>
+                  <div className="metric-value">{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

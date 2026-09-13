@@ -18,6 +18,7 @@ from backend.core.auth import (UsernameTakenError, authenticate, change_password
                                revoke_token, verify_refresh_token, verify_token)
 from backend.core.config import get_settings
 from backend.core.graph import topology
+from backend.core.graph.layout import build_map_analytics
 from backend.core.logging_util import get_logger, log_with
 from backend.core.models import classification, delay, registry
 from backend.core.predictor import get_engine
@@ -314,8 +315,11 @@ def get_eta(shipment_id: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-@router.get("/graph/{route_id}")
-def get_graph(route_id: str) -> Dict[str, Any]:
+# Graph data for the route map. demo_n_sim keeps the map light: node risk comes
+# from the classifier/quantile models and does not depend on the MC simulation,
+# so a small n_sim is enough for visualisation.
+# ---------------------------------------------------------------------------
+def _route_graph(route_id: str, demo_n_sim: int = 100) -> Dict[str, Any]:
     r = topology.route_by_id(route_id)
     if r is None:
         raise HTTPException(status_code=404, detail=f"Unknown route {route_id}")
@@ -323,6 +327,7 @@ def get_graph(route_id: str) -> Dict[str, Any]:
         eng = get_engine()
         demo = eng.predict_shipment("frankfurt", "final_destination",
                                     route_id=route_id,
+                                    n_sim=demo_n_sim,
                                     seed=get_settings().demo_seed)
     except RuntimeError:
         demo = None
@@ -338,11 +343,14 @@ def get_graph(route_id: str) -> Dict[str, Any]:
             }
             for n in demo["node_predictions"] if n["node_id"] in r.node_ids
         }
+    analytics = build_map_analytics()
     nodes = [
         {"node_id": n, "label": topology.node_label(n),
          "kind": topology.node_index()[n]["kind"],
          "lon": topology.node_index()[n]["lon"],
          "lat": topology.node_index()[n]["lat"],
+         "pos": analytics["positions"].get(n, {}),
+         "metrics": analytics["metrics"].get(n, {}),
          "risk": risk_by_node.get(n, {})}
         for n in r.node_ids
     ]
@@ -352,6 +360,21 @@ def get_graph(route_id: str) -> Dict[str, Any]:
         for e in topology.route_edges(r)
     ]
     return {"route_id": route_id, "name": r.name, "nodes": nodes, "edges": edges}
+
+
+@router.get("/graphs")
+def get_graphs() -> Dict[str, Any]:
+    """All route graphs in one call (for the route-map overlay)."""
+    return {
+        "routes": [_route_graph(r.route_id) for r in topology.ROUTES],
+        "default_route": topology.DEFAULT_ROUTE,
+        "network": build_map_analytics()["network"],
+    }
+
+
+@router.get("/graph/{route_id}")
+def get_graph(route_id: str) -> Dict[str, Any]:
+    return _route_graph(route_id)
 
 
 @router.get("/node/{node_id}/risk")

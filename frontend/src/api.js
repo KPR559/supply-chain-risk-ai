@@ -89,6 +89,7 @@ export const api = {
   explain: (shipmentId) => get(`/explanation/${shipmentId}`),
   critical: (shipmentId) => get(`/critical-nodes/${shipmentId}`),
   graph: (routeId) => get(`/graph/${routeId}`),
+  graphs: () => get("/graphs"),
   metrics: () => get("/metrics"),
   dataQuality: () => get("/data-quality"),
   routes: () => get("/routes"),

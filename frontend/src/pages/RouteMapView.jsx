@@ -13,10 +13,8 @@ export default function RouteMapView({ data }) {
         <div>
           <div className="view-title">Route Map</div>
           <div className="view-sub">
-            {selectedShipment
-              ? `${selectedShipment.id} · ${selectedShipment.origin} → ${selectedShipment.destination}`
-              : "Frankfurt → India"}{" "}
-            · {meta?.name || route}
+            {selectedShipment && `${selectedShipment.id} · ${selectedShipment.origin} → ${selectedShipment.destination} · `}
+            {meta?.name || route}
             {meta?.distance_km != null && ` · ${Math.round(meta.distance_km).toLocaleString()} km`}
           </div>
         </div>
@@ -33,7 +31,7 @@ export default function RouteMapView({ data }) {
 
       {prediction && (
         <section className="panel">
-          <RouteMap graph={route} nodes={prediction?.node_predictions} />
+          <RouteMap activeRouteId={route} nodes={prediction?.node_predictions} />
         </section>
       )}
     </div>

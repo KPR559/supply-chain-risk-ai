@@ -90,7 +90,7 @@ across seven families:
 | `backend/core/predictor.py` | `PredictionEngine` singleton powering the API |
 | `backend/core/data/` | synthetic / validation / anomalies / loaders |
 | `backend/core/features/` | node_features / derived |
-| `backend/core/graph/` | topology (data-driven), network (cascade), gat (optional) |
+| `backend/core/graph/` | topology (data-driven), network (cascade), layout (networkx map layout/metrics), gat (optional) |
 | `backend/core/models/` | registry, classification (Stage A), delay (Stage B) |
 | `backend/core/simulation/` | monte_carlo (Stage D) |
 | `backend/core/routing/` | scenarios, comparison, recommendation |

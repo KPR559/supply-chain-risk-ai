@@ -142,8 +142,19 @@ Body: `CompareRoutesRequest`. Returns per-objective recommendations:
 Body: `SimulateRequest`. Standalone Monte Carlo run (200 default n_sim).
 
 ### `GET /graph/{route_id}`
-Route graph for visualisation — nodes with `lon`/`lat`/`kind`/`risk` and edges.
-Runs a demo Suez prediction internally to source per-node risk.
+Route graph for visualisation — nodes with `lon`/`lat`/`kind`/`pos`/`metrics`/`risk` and edges.
+Runs a demo prediction internally to source per-node risk.
+
+### `GET /graphs`
+All route graphs in one call for the route-map overlay. Same node/edge shape as
+`/graph/{route_id}` per route, plus a top-level `network` summary.
+
+- `pos`: per-node 0..1 positions from a **NetworkX** `spring_layout` (geographic
+  seed, origin/destination anchored).
+- `metrics`: per-node NetworkX analytics — `betweenness`, `closeness`, `degree`,
+  `hops_from_origin`, `hops_to_dest`.
+- `network`: graph-level summary — node/edge counts, `diameter`,
+  `avg_shortest_path`, sources/sink.
 
 ### `GET /node/{node_id}/risk`
 Per-node risk from the hardcoded Suez demo prediction. `404` if unknown.
