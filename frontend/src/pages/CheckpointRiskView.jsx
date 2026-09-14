@@ -21,11 +21,6 @@ export default function CheckpointRiskView({ data }) {
   const [sort, setSort] = useState("risk-desc");
   const [selectedId, setSelectedId] = useState(null);
 
-  const shareById = useMemo(
-    () => Object.fromEntries((critical?.critical_nodes || []).map((c) => [c.node_id, c.delay_share ?? 0])),
-    [critical]
-  );
-
   const rankByProb = useMemo(
     () => [...nodes].sort((a, b) => (b.delay_probability ?? 0) - (a.delay_probability ?? 0)),
     [nodes]
@@ -54,8 +49,6 @@ export default function CheckpointRiskView({ data }) {
     }[sort];
     return filtered.sort(by);
   }, [nodes, query, sort]);
-
-  void shareById;
 
   return (
     <div className="view-stack">

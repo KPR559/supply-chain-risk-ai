@@ -66,6 +66,39 @@ export function fmtDays(v) {
   return `${Number(v).toFixed(1)} days`;
 }
 
+/** Percentile key "p10" → "P10", "p90" → "P90". */
+export function formatPercentileLabel(key) {
+  const k = String(key || "").replace(/^p/i, "");
+  return `P${k || "—"}`;
+}
+
+/**
+ * Deadline-miss risk tier. Suggested frontend thresholds (0.2 / 0.5 / 0.8)
+ * with a Critical tier at ≥80%.
+ * @returns {{ label: string, cls: "low"|"med"|"high"|"critical" }}
+ */
+export function getDeadlineRiskLevel(miss) {
+  const m = Number(miss);
+  if (!Number.isFinite(m)) return { label: "On track", cls: "low" };
+  if (m >= 0.8) return { label: "Will likely miss", cls: "critical" };
+  if (m >= 0.5) return { label: "High risk", cls: "high" };
+  if (m >= 0.2) return { label: "At risk", cls: "med" };
+  return { label: "On track", cls: "low" };
+}
+
+/**
+ * Arrival buffer (days) → display label + styling.
+ * Positive → green "+N days" · zero → amber "No buffer" · negative → red "N days overdue".
+ * @returns {{ cls: ""|"low"|"med"|"high", label: string }}
+ */
+export function getBufferStatus(buffer) {
+  const n = Number(buffer);
+  if (buffer == null || Number.isNaN(n)) return { cls: "", label: NA };
+  if (n < 0) return { cls: "high", label: `${Math.abs(n)} days overdue` };
+  if (n === 0) return { cls: "med", label: "No buffer" };
+  return { cls: "low", label: `+${n} days buffer` };
+}
+
 /** Whole days between two YYYY-MM-DD dates. Nullish/invalid → null. */
 export function daysBetween(a, b) {
   if (!a || !b) return null;

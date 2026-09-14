@@ -1,9 +1,40 @@
 import React from "react";
 import { formatShortDate } from "../utils/helpers.js";
+import { formatPercentileLabel } from "../models.js";
+
+const MARKER_COLOR = {
+  p10: "#94a3b8",
+  p25: "#94a3b8",
+  p50: "#38bdf8",
+  p80: "#94a3b8",
+  p90: "#f59e0b",
+  p95: "#f59e0b",
+};
 
 function normalPdf(x, mu, sigma) {
   const z = (x - mu) / sigma;
   return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+}
+
+// Rough text width estimate for the small SVG labels (monospace-ish).
+function estW(s, size) {
+  return String(s).length * (size * 0.62) + 6;
+}
+
+// Assign each item to one of two vertical rows so labels never overlap.
+function assignRows(items) {
+  const rows = [[], []];
+  return items.map((it) => {
+    for (let r = 0; r < rows.length; r++) {
+      const ok = rows[r].every((o) => Math.abs(it.x - o.x) > (it.w + o.w) / 2 + 5);
+      if (ok) {
+        rows[r].push(it);
+        return { ...it, row: r };
+      }
+    }
+    rows[0].push(it);
+    return { ...it, row: 0 };
+  });
 }
 
 export default function PercentileChart({ mc }) {
@@ -12,19 +43,19 @@ export default function PercentileChart({ mc }) {
   }
 
   const pcts = mc.percentiles;
-  const p10 = pcts.p10 ?? 0;
+  const p10 = pcts.p10 ?? pcts.p25 ?? 0;
   const p50 = pcts.p50 ?? 0;
-  const p90 = pcts.p90 ?? 0;
+  const p90 = pcts.p90 ?? pcts.p95 ?? p50 + 1;
   const mu = p50;
   const sigma = Math.max((p90 - p10) / 2.56, 1);
   const minX = p10 - sigma * 0.8;
   const maxX = p90 + sigma * 0.8;
   const W = 680;
-  const H = 180;
-  const padL = 40;
+  const H = 220;
+  const padL = 44;
   const padR = 20;
-  const padT = 20;
-  const padB = 36;
+  const padT = 24;
+  const padB = 48;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -45,13 +76,27 @@ export default function PercentileChart({ mc }) {
   const areaD = `M ${padL},${padT + plotH} L ${pathPts.join(" L ")} L ${padL + plotW},${padT + plotH} Z`;
 
   const etaDates = mc.eta_date || {};
-  const markers = [
-    { key: "p10", val: p10, label: "P10", color: "#94a3b8" },
-    { key: "p50", val: p50, label: "P50", color: "#38bdf8" },
-    { key: "p80", val: pcts.p80 ?? p90, label: "P80", color: "#94a3b8" },
-    { key: "p90", val: p90, label: "P90", color: "#94a3b8" },
-    { key: "p95", val: pcts.p95 ?? p90, label: "P95", color: "#94a3b8" },
-  ];
+  const markerKeys = ["p10", "p25", "p50", "p80", "p90", "p95"].filter((k) => pcts[k] != null);
+  const markers = markerKeys.map((k) => ({
+    key: k,
+    val: pcts[k],
+    label: formatPercentileLabel(k),
+    color: MARKER_COLOR[k] || "#94a3b8",
+  }));
+
+  const topRows = assignRows(
+    markers.map((m) => ({ x: toX(m.val), w: estW(m.label, 9), key: m.key }))
+  );
+  const bottomRows = assignRows(
+    markers.map((m) => {
+      const dateStr = etaDates[m.key] ? formatShortDate(etaDates[m.key]) : `${m.val.toFixed(0)} d`;
+      return { x: toX(m.val), w: estW(dateStr, 9.5), key: m.key };
+    })
+  );
+  const dateStrOf = (k) => {
+    const m = markers.find((x) => x.key === k);
+    return etaDates[k] ? formatShortDate(etaDates[k]) : `${m.val.toFixed(0)} d`;
+  };
 
   // Deadline marker: interpolate the deadline date onto the days axis using
   // the known (percentile days → eta date) pairs. Skipped when it falls
@@ -83,15 +128,24 @@ export default function PercentileChart({ mc }) {
     }
   }
 
+  const gridYs = [0, 1, 2, 3, 4].map((i) => padT + (i / 4) * plotH);
+
   return (
     <div className="distribution-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} className="dist-svg">
+      <svg viewBox={`0 0 ${W} ${H}`} className="dist-svg" role="img" aria-label="Estimated arrival distribution">
         <defs>
           <linearGradient id="distGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.45} />
             <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} />
           </linearGradient>
         </defs>
+
+        <g>
+          {gridYs.map((y) => (
+            <line key={y} x1={padL} y1={y} x2={padL + plotW} y2={y} stroke="rgba(148,163,184,0.14)" strokeWidth={1} />
+          ))}
+        </g>
+
         <path d={areaD} fill="url(#distGrad)" />
         <path d={`M ${pathPts.join(" L ")}`} fill="none" stroke="#38bdf8" strokeWidth={2} />
 
@@ -115,7 +169,7 @@ export default function PercentileChart({ mc }) {
             >
               <title>Late arrival region — after {formatShortDate(mc.deadline_date)}</title>
             </line>
-            <text x={deadlineX} y={padT - 4} textAnchor="middle" className="dist-marker-label" fill="#ef4444">
+            <text x={deadlineX} y={padT - 6} textAnchor="middle" className="dist-marker-label" fill="#ef4444">
               Deadline
             </text>
           </g>
@@ -123,9 +177,11 @@ export default function PercentileChart({ mc }) {
 
         {markers.map((m) => {
           const x = toX(m.val);
-          const dateStr = etaDates[m.key]
-            ? formatShortDate(etaDates[m.key])
-            : `${m.val.toFixed(0)} d`;
+          const dateStr = dateStrOf(m.key);
+          const top = topRows.find((t) => t.key === m.key);
+          const bot = bottomRows.find((b) => b.key === m.key);
+          const topY = padT - 6 - (top?.row === 1 ? 14 : 0);
+          const botY = H - 24 - (bot?.row === 1 ? 14 : 0);
           return (
             <g key={m.key}>
               <title>{`${m.label}: ${dateStr}`}</title>
@@ -139,22 +195,24 @@ export default function PercentileChart({ mc }) {
                 strokeDasharray="4 3"
                 opacity={0.8}
               />
-              <text x={x} y={padT - 4} textAnchor="middle" className="dist-marker-label">
+              <text x={x} y={topY} textAnchor="middle" className="dist-marker-label" fill={m.color}>
                 {m.label}
               </text>
-              <text x={x} y={H - 8} textAnchor="middle" className="dist-marker-date">
+              <text x={x} y={botY} textAnchor="middle" className="dist-marker-date">
                 {dateStr}
               </text>
             </g>
           );
         })}
 
-        <text x={padL + plotW / 2} y={H - 2} textAnchor="middle" className="dist-axis-label">
+        <text x={padL + plotW / 2} y={H - 6} textAnchor="middle" className="dist-axis-label">
           Estimated Arrival Date
         </text>
       </svg>
       <div className="note">
-        {mc.n_simulations?.toLocaleString()} Monte Carlo simulations · graph-propagated node risk
+        {mc.n_simulations != null
+          ? `${mc.n_simulations.toLocaleString()} Monte Carlo simulations · graph-propagated node risk`
+          : "Estimated arrival distribution from Monte Carlo simulation"}
       </div>
     </div>
   );
