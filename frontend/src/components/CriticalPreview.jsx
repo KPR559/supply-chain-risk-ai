@@ -1,6 +1,6 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
-import { fmtPct, kindLabel, riskBand } from "../models.js";
+import { fmtPct, getCheckpointKind, kindLabel, riskBand } from "../models.js";
 
 export default function CriticalPreview({ critical, prediction, onNavigate }) {
   const items = (critical?.critical_nodes || []).slice(0, 3);
@@ -41,7 +41,7 @@ export default function CriticalPreview({ critical, prediction, onNavigate }) {
                   <span className={`risk-pill ${badge.cls}`}>{badge.text}</span>
                 </span>
                 <span className="crit-preview-sub">
-                  <span className="tip-kind">{kindLabel(n.kind)}</span>
+                  <span className="tip-kind">{kindLabel(getCheckpointKind(n))}</span>
                   <span>Delay probability {fmtPct(n.delay_probability)}</span>
                 </span>
                 <span className="muted" title="Share of total expected shipment delay attributed to this checkpoint (backend delay_share).">

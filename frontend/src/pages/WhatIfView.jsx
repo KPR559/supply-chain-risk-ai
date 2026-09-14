@@ -3,15 +3,20 @@ import WhatIfPanel from "../components/WhatIfPanel.jsx";
 import TabState from "../components/TabState.jsx";
 
 export default function WhatIfView({ data }) {
-  const { prediction, loading, apiError, onRetry } = data;
+  const { prediction, selectedShipment, loading, apiError, onRetry } = data;
   const ready = Boolean(prediction);
 
+  const shipmentDisplay = selectedShipment
+    ? `${selectedShipment.id} · ${selectedShipment.origin || "Unknown"} → ${selectedShipment.destination || "Unknown"}`
+    : "No shipment selected";
+
   return (
-    <div className="view-stack">
+    <div className="view-stack what-if-page">
       <div className="view-head">
         <div>
           <div className="view-title">What-if Simulator</div>
           <div className="view-sub">Stress-test the corridor — congestion, weather, closures</div>
+          <div className="view-shipment">{shipmentDisplay}</div>
         </div>
       </div>
 
@@ -24,24 +29,7 @@ export default function WhatIfView({ data }) {
         loadingText="Loading baseline…"
       />
 
-      {ready && (
-        <>
-          <section className="panel">
-            <h2>Custom Scenario</h2>
-            <WhatIfPanel prediction={prediction} />
-          </section>
-
-          <section className="panel">
-            <h2>How to use</h2>
-            <div className="howto">
-              <ol>
-                <li>Pick a preset (e.g. "Suez closed") or tune congestion × / weather +h on the scenario panel and run it.</li>
-                <li>Read the baseline vs scenario Δ — how much the ETA P90 and expected days move.</li>
-              </ol>
-            </div>
-          </section>
-        </>
-      )}
+      {ready && <WhatIfPanel prediction={prediction} />}
     </div>
   );
 }

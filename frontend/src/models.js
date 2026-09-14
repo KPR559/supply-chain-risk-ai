@@ -223,8 +223,10 @@ export function describeFactor(name) {
 const KIND_LABELS = {
   origin: "Origin",
   warehouse: "Hub",
+  hub: "Hub",
   canal: "Canal",
   sea: "Open Sea",
+  ocean: "Open Sea",
   transshipment: "Transshipment",
   port: "Port",
   customs: "Customs",
@@ -284,4 +286,95 @@ export function statusClass(status) {
   if (s.includes("delay") || s.includes("disrupt")) return "high";
   if (s.includes("customs") || s.includes("hold") || s.includes("risk")) return "med";
   return "";
+}
+
+/**
+ * Checkpoint kinds for the demo corridor, keyed by node id. node_predictions
+ * do not always carry a "kind" field; the corridor topology defines these, so
+ * this map fills the gap so the Kind column never renders an unexplained "-".
+ */
+const NODE_KIND_BY_ID = {
+  frankfurt: "origin",
+  european_hub: "hub",
+  suez: "canal",
+  cape_of_good_hope: "ocean",
+  indian_ocean: "ocean",
+  colombo: "port",
+  dubai: "port",
+  mumbai: "port",
+  customs: "customs",
+  final_destination: "destination",
+};
+
+/**
+ * Checkpoint kind for display. Prefers the backend-reported node.kind, falls
+ * back to the corridor topology by node id, then to a neutral "checkpoint"
+ * placeholder — never "-".
+ */
+export function getCheckpointKind(node) {
+  if (node?.kind) return node.kind;
+  if (!node) return "checkpoint";
+  return NODE_KIND_BY_ID[node.node_id] || "checkpoint";
+}
+
+/**
+ * Risk tier for the Checkpoint Risk risk badge.
+ * 0–10% Low · 10–30% Moderate · 30–70% High · >70% Critical.
+ * @returns {{ label: "Low Risk"|"Moderate Risk"|"High Risk"|"Critical Risk", cls: "low"|"med"|"high"|"critical", critical: boolean }}
+ */
+export function getCheckpointRiskLevel(prob) {
+  const p = Number(prob);
+  if (!Number.isFinite(p)) return { label: "Low Risk", cls: "low", critical: false };
+  if (p > 0.7) return { label: "Critical Risk", cls: "critical", critical: true };
+  if (p > 0.3) return { label: "High Risk", cls: "high", critical: false };
+  if (p > 0.1) return { label: "Moderate Risk", cls: "med", critical: false };
+  return { label: "Low Risk", cls: "low", critical: false };
+}
+
+/** Checkpoint status badge label + pill tone from regime + risk tier. */
+export function getCheckpointStatus(node) {
+  const level = getCheckpointRiskLevel(node?.delay_probability);
+  if (node?.regime === 1) {
+    return level.critical
+      ? { label: "Critical", tone: "critical" }
+      : { label: "Disrupted", tone: "high" };
+  }
+  if (level.critical || level.cls === "high") return { label: "Elevated", tone: "med" };
+  if ((node?.expected_delay_hours ?? 0) > 12) return { label: "Elevated", tone: "med" };
+  return { label: "On Time", tone: "low" };
+}
+
+/** Hours → compact duration with unit: "79.6 h" or "3.3 days". Nullish → "—". */
+export function fmtDelayDuration(hours) {
+  if (hours == null || Number.isNaN(Number(hours))) return NA;
+  const h = Number(hours);
+  return h < 24 ? `${h.toFixed(1)} h` : `${(h / 24).toFixed(1)} days`;
+}
+
+/** Main risk drivers derived from the per-node monitoring signals. */
+export function getCheckpointDrivers(node) {
+  const drivers = [];
+  if (!node) return ["Contribution within model norms"];
+  if (node.regime === 1) drivers.push("Active disruption regime");
+  if ((node.congestion ?? 0) >= 0.3) drivers.push("Elevated congestion level");
+  if ((node.weather ?? 0) >= 0.3) drivers.push("Severe weather exposure");
+  if ((node.conflict ?? 0) >= 0.3) drivers.push("Geopolitical / conflict risk");
+  if ((node.delay_probability ?? 0) > 0.7) drivers.push("Very high delay probability");
+  if ((node.expected_delay_hours ?? 0) > 24) drivers.push("Long expected queue time");
+  return drivers.length ? drivers : ["Contribution within model norms"];
+}
+
+/** Suggested mitigation for a checkpoint, chosen from its kind. */
+export function getCheckpointMitigation(node) {
+  const map = {
+    canal: "Consider alternative routing (e.g. Cape of Good Hope) during high-risk windows and pre-clear transit slots.",
+    port: "Engage the local port agent, pre-book berthing, and monitor dwell-time windows to cut turnaround.",
+    customs: "Pre-submit clearance documentation and parallelize inspections to compress customs dwell.",
+    ocean: "Track weather windows and adjust sailing speed dynamically to absorb sea-leg variability.",
+    destination: "Coordinate last-mile delivery windows with the consignee and buffer local storage.",
+    origin: "Add buffer inventory before departure and confirm trucking capacity early.",
+    hub: "Gate shipments through this hub in priority order and monitor transshipment buffers.",
+    checkpoint: "Monitor checkpoint indicators and review contingency plans for this leg.",
+  };
+  return map[getCheckpointKind(node)] || map.checkpoint;
 }
