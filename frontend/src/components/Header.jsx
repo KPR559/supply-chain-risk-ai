@@ -1,5 +1,5 @@
 import React from "react";
-import { RefreshCw } from "lucide-react";
+import { Moon, RefreshCw, Sun } from "lucide-react";
 
 export default function Header({
   shipments,
@@ -9,6 +9,8 @@ export default function Header({
   lastUpdated,
   onRefresh,
   prediction,
+  theme,
+  onToggleTheme,
 }) {
   const list = shipments || [];
 
@@ -44,6 +46,20 @@ export default function Header({
           >
             <RefreshCw size={15} aria-hidden="true" className={loading ? "spin" : ""} />
           </button>
+          {onToggleTheme && (
+            <button
+              className="refresh-btn"
+              onClick={onToggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun size={15} aria-hidden="true" />
+              ) : (
+                <Moon size={15} aria-hidden="true" />
+              )}
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -3,6 +3,7 @@
   --sidebar: #0a111f;
   --panel: #0d1726;
   --panel2: #0a1220;
+  --surface: #0b1322;
   --surface-elevated: #111f32;
   --surface-hover: #16283d;
   --border: rgba(148, 163, 184, 0.16);
@@ -20,6 +21,36 @@
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --sidebar-w: 200px;
 }
+[data-theme="light"] {
+  --bg: #f2f5f9;
+  --sidebar: #ffffff;
+  --panel: #ffffff;
+  --panel2: #eef1f6;
+  --surface: #e7ecf3;
+  --surface-elevated: #ffffff;
+  --surface-hover: #eef3fa;
+  --border: rgba(15, 23, 42, 0.12);
+  --border-light: rgba(15, 23, 42, 0.22);
+  --text: #0f172a;
+  --muted: #55637a;
+  --text-muted: #6b7686;
+  --accent: #0284c7;
+  --primary-strong: #0369a1;
+  --green: #15803d;
+  --amber: #a15c00;
+  --red: #b91c1c;
+  --purple: #7c3aed;
+}
+
+[data-theme="light"] .risk-pill.high,
+[data-theme="light"] .risk-badge.high { background: rgba(239, 68, 68, 0.14); color: #b91c1c; }
+[data-theme="light"] .risk-pill.med,
+[data-theme="light"] .risk-badge.med,
+[data-theme="light"] .risk-badge.medium { background: rgba(161, 92, 0, 0.14); color: #a15c00; }
+[data-theme="light"] .risk-pill.low,
+[data-theme="light"] .risk-badge.low { background: rgba(21, 128, 61, 0.14); color: #15803d; }
+[data-theme="light"] .risk-pill.critical,
+[data-theme="light"] .risk-badge.critical { background: rgba(185, 28, 28, 0.2); color: #7f1d1d; }
 
 * { box-sizing: border-box; }
 
