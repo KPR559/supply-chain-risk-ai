@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import { clearSession, getSession, saveSession, updateSessionTokens } from "./auth.js";
+import { getStoredTheme, applyTheme } from "./theme.js";
 import {
   loadSelectedId,
   loadShipments,
@@ -56,9 +57,20 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [theme, setThemeState] = useState(() => {
+    const t = getStoredTheme();
+    applyTheme(t);
+    return t;
+  });
   const [toast, setToast] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const toastTimer = React.useRef(null);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setThemeState(next);
+  };
 
   const notify = useCallback((msg) => {
     try {
@@ -367,6 +379,8 @@ export default function App() {
             notify("Refreshing shipment intelligence…");
           }}
           prediction={prediction}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
 
         {loading && !prediction && <div className="loading-bar" />}
