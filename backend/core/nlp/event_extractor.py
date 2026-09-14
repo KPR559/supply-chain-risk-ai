@@ -23,13 +23,27 @@ from backend.core.logging_util import get_logger
 log = get_logger(__name__)
 
 NODE_ALIASES = {
-    "suez": ["suez", "suez canal", "red sea"],
+    "shanghai": ["shanghai"],
+    "singapore": ["singapore"],
+    "busan": ["busan"],
+    "rotterdam": ["rotterdam", "antwerp", "hamburg", "europe"],
+    "los_angeles": ["los angeles", "long beach", "san pedro bay"],
+    "new_york": ["new york", "newark", "new jersey"],
+    "dubai": ["dubai", "jebel ali"],
     "mumbai": ["mumbai", "nhava sheva", "jawaharlal nehru port"],
     "colombo": ["colombo"],
-    "dubai": ["dubai", "jebel ali"],
-    "european_hub": ["europe", "rotterdam", "hamburg", "antwerp", "fr william", "germany"],
+    "suez": ["suez", "suez canal", "red sea"],
+    "panama_canal": ["panama canal"],
+    "strait_of_malacca": ["malacca", "strait of malacca"],
+    "strait_of_hormuz": ["hormuz", "persian gulf", "strait of hormuz"],
+    "bab_el_mandeb": ["bab el-mandeb", "bab el mandeb", "houthi", "yemen", "red sea"],
+    "strait_of_gibraltar": ["gibraltar", "strait of gibraltar"],
+    "taiwan_strait": ["taiwan strait", "taiwan"],
     "indian_ocean": ["indian ocean"],
-    "cape_of_good_hope": ["cape", "cape of good hope", "good hope"],
+    "cape_of_good_hope": ["cape of good hope", "cape route"],
+    "english_channel": ["english channel", "dover"],
+    # legacy aliases kept for back-compat
+    "european_hub": ["europe", "rotterdam", "hamburg", "antwerp", "fr william", "germany"],
     "customs": ["customs", "clearance", "import"],
     "final_destination": ["delhi", "destination"],
 }

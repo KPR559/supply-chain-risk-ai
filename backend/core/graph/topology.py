@@ -1,31 +1,39 @@
-"""Route / network topology definition for the Frankfurt -> India corridor.
+"""Route / network topology — 19-node port-to-port global scope.
 
-The network is kept **data-driven**: nodes, edges and routes are declared here
-(and can be loaded from JSON in the future) rather than being hardcoded in
-model or propagation logic.
+Nodes/edges are data-driven (also persisted as data/silver/checkpoints.parquet
+and data/silver/route_edges.parquet for DuckDB). This module is the
+in-memory source of truth for the API, GNN and Monte Carlo.
+
+Scope: 9 ports + 2 canals + 5 straits + 3 seas (port-to-port, global).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 # ---------------------------------------------------------------------------
-# Nodes
+# Nodes (19) — mirrors backend/core/data/global_nodes.py FINAL_NODES
 # ---------------------------------------------------------------------------
-# Each node: id, label, kind, coordinates (for visualisation), risk-relevant
-# attributes used by the generator and models.
-
 NODE_DEFS: List[Dict] = [
-    {"id": "frankfurt", "label": "Frankfurt", "kind": "origin", "lon": 8.68, "lat": 50.11},
-    {"id": "european_hub", "label": "European Hub", "kind": "warehouse", "lon": 4.42, "lat": 51.93},
+    {"id": "shanghai", "label": "Shanghai Port", "kind": "port", "lon": 121.48, "lat": 31.23, "country": "CN"},
+    {"id": "singapore", "label": "Singapore Port", "kind": "port", "lon": 103.82, "lat": 1.26, "country": "SG"},
+    {"id": "busan", "label": "Busan Port", "kind": "port", "lon": 129.04, "lat": 35.10, "country": "KR"},
+    {"id": "rotterdam", "label": "Port of Rotterdam", "kind": "port", "lon": 4.14, "lat": 51.95, "country": "NL"},
+    {"id": "los_angeles", "label": "Port of Los Angeles", "kind": "port", "lon": -118.26, "lat": 33.73, "country": "US"},
+    {"id": "new_york", "label": "Port of New York", "kind": "port", "lon": -74.02, "lat": 40.68, "country": "US"},
+    {"id": "dubai", "label": "Jebel Ali Port", "kind": "port", "lon": 55.06, "lat": 25.01, "country": "AE"},
+    {"id": "mumbai", "label": "Mumbai Port", "kind": "port", "lon": 72.88, "lat": 18.94, "country": "IN"},
+    {"id": "colombo", "label": "Colombo Port", "kind": "port", "lon": 79.86, "lat": 6.93, "country": "LK"},
     {"id": "suez", "label": "Suez Canal", "kind": "canal", "lon": 32.55, "lat": 30.05},
-    {"id": "cape_of_good_hope", "label": "Cape of Good Hope", "kind": "sea", "lon": 18.42, "lat": -34.36},
+    {"id": "panama_canal", "label": "Panama Canal", "kind": "canal", "lon": -79.68, "lat": 9.08},
+    {"id": "strait_of_malacca", "label": "Strait of Malacca", "kind": "strait", "lon": 101.0, "lat": 2.5},
+    {"id": "strait_of_hormuz", "label": "Strait of Hormuz", "kind": "strait", "lon": 56.25, "lat": 26.57},
+    {"id": "bab_el_mandeb", "label": "Bab el-Mandeb", "kind": "strait", "lon": 43.33, "lat": 12.58},
+    {"id": "strait_of_gibraltar", "label": "Strait of Gibraltar", "kind": "strait", "lon": -5.60, "lat": 35.97},
+    {"id": "taiwan_strait", "label": "Taiwan Strait", "kind": "strait", "lon": 119.0, "lat": 24.0},
     {"id": "indian_ocean", "label": "Indian Ocean", "kind": "sea", "lon": 60.0, "lat": -5.0},
-    {"id": "colombo", "label": "Colombo", "kind": "transshipment", "lon": 79.86, "lat": 6.93},
-    {"id": "dubai", "label": "Dubai", "kind": "transshipment", "lon": 55.27, "lat": 25.20},
-    {"id": "mumbai", "label": "Mumbai Port", "kind": "port", "lon": 72.88, "lat": 18.94},
-    {"id": "customs", "label": "Customs", "kind": "customs", "lon": 72.88, "lat": 19.0},
-    {"id": "final_destination", "label": "Final Destination", "kind": "destination", "lon": 77.21, "lat": 28.61},
+    {"id": "cape_of_good_hope", "label": "Cape of Good Hope", "kind": "sea", "lon": 18.42, "lat": -34.36},
+    {"id": "english_channel", "label": "English Channel", "kind": "sea", "lon": 0.50, "lat": 50.50},
 ]
 
 
@@ -35,24 +43,39 @@ class EdgeDef:
     dst: str
     mode: str
     distance_km: float
-    baseline_days: float  # typical transit time in days
-    reliability: float = 0.9  # 1.0 = perfectly reliable
+    baseline_days: float
+    reliability: float = 0.9
 
 
-# All possible directed edges across the corridor. Routes select subsets.
+# 25 directed edges — Haversine distances from global_nodes coords, 800 km/day sea speed
 EDGE_DEFS: List[EdgeDef] = [
-    EdgeDef("frankfurt", "european_hub", "road", 260.0, 0.4, 0.95),
-    EdgeDef("european_hub", "suez", "sea", 11500.0, 5.5, 0.80),
-    EdgeDef("european_hub", "cape_of_good_hope", "sea", 19000.0, 15.0, 0.88),
-    EdgeDef("suez", "indian_ocean", "sea", 3000.0, 3.5, 0.82),
-    EdgeDef("cape_of_good_hope", "indian_ocean", "sea", 5000.0, 4.0, 0.90),
-    EdgeDef("indian_ocean", "colombo", "sea", 1500.0, 2.0, 0.92),
-    EdgeDef("indian_ocean", "mumbai", "sea", 3000.0, 2.8, 0.90),
-    EdgeDef("suez", "dubai", "sea", 3000.0, 4.0, 0.85),
-    EdgeDef("dubai", "mumbai", "sea", 1900.0, 2.5, 0.90),
-    EdgeDef("colombo", "mumbai", "sea", 2000.0, 2.6, 0.91),
-    EdgeDef("mumbai", "customs", "port", 0.0, 1.5, 0.75),
-    EdgeDef("customs", "final_destination", "road", 300.0, 1.0, 0.85),
+    EdgeDef("shanghai", "taiwan_strait", "sea", 840.2, 1.1, 0.88),
+    EdgeDef("taiwan_strait", "singapore", "sea", 3010.8, 3.8, 0.91),
+    EdgeDef("shanghai", "busan", "sea", 824.5, 1.0, 0.91),
+    EdgeDef("busan", "taiwan_strait", "sea", 1568.5, 2.0, 0.88),
+    EdgeDef("singapore", "strait_of_malacca", "sea", 342.4, 0.4, 0.90),
+    EdgeDef("strait_of_malacca", "indian_ocean", "sea", 4630.3, 5.8, 0.91),
+    EdgeDef("indian_ocean", "colombo", "sea", 2572.4, 3.2, 0.91),
+    EdgeDef("colombo", "mumbai", "sea", 1534.0, 1.9, 0.91),
+    EdgeDef("mumbai", "colombo", "sea", 1534.0, 1.9, 0.91),
+    EdgeDef("indian_ocean", "strait_of_hormuz", "sea", 3533.6, 4.4, 0.82),
+    EdgeDef("strait_of_hormuz", "dubai", "sea", 210.4, 0.3, 0.91),
+    EdgeDef("dubai", "mumbai", "sea", 1955.4, 2.4, 0.91),
+    EdgeDef("indian_ocean", "bab_el_mandeb", "sea", 2686.0, 3.4, 0.75),
+    EdgeDef("bab_el_mandeb", "suez", "sea", 2237.4, 2.8, 0.80),
+    EdgeDef("suez", "strait_of_gibraltar", "sea", 3594.4, 4.5, 0.91),
+    EdgeDef("strait_of_gibraltar", "english_channel", "sea", 1688.1, 2.1, 0.91),
+    EdgeDef("english_channel", "rotterdam", "sea", 300.4, 0.4, 0.91),
+    EdgeDef("rotterdam", "new_york", "sea", 5834.2, 7.3, 0.91),
+    EdgeDef("new_york", "panama_canal", "sea", 3557.9, 4.4, 0.88),
+    EdgeDef("panama_canal", "new_york", "sea", 3557.9, 4.4, 0.88),
+    EdgeDef("panama_canal", "los_angeles", "sea", 4797.5, 6.0, 0.91),
+    EdgeDef("los_angeles", "panama_canal", "sea", 4797.5, 6.0, 0.91),
+    EdgeDef("shanghai", "los_angeles", "sea", 10456.9, 13.1, 0.91),
+    EdgeDef("singapore", "los_angeles", "sea", 14146.5, 17.7, 0.91),
+    EdgeDef("indian_ocean", "cape_of_good_hope", "sea", 5378.3, 6.7, 0.92),
+    EdgeDef("cape_of_good_hope", "english_channel", "sea", 9598.8, 12.0, 0.91),
+    EdgeDef("cape_of_good_hope", "strait_of_gibraltar", "sea", 8207.8, 10.3, 0.91),
 ]
 
 
@@ -66,29 +89,34 @@ class Route:
 
 ROUTES: List[Route] = [
     Route(
-        "suez",
-        "Route A - Suez Canal",
-        "Reference route through Suez Canal and Colombo transshipment to Mumbai.",
-        ["frankfurt", "european_hub", "suez", "indian_ocean", "colombo", "mumbai", "customs", "final_destination"],
+        "asia_europe_suez",
+        "Asia–Europe via Suez",
+        "Shanghai → Singapore → Malacca → Indian Ocean → Bab el-Mandeb → Suez → Gibraltar → Rotterdam (primary).",
+        ["shanghai", "taiwan_strait", "singapore", "strait_of_malacca", "indian_ocean", "bab_el_mandeb", "suez", "strait_of_gibraltar", "english_channel", "rotterdam"],
     ),
     Route(
-        "cape",
-        "Route B - Cape of Good Hope",
-        "Bypasses Suez via the Cape of Good Hope - longer but avoids Suez risk.",
-        ["frankfurt", "european_hub", "cape_of_good_hope", "indian_ocean", "colombo", "mumbai", "customs", "final_destination"],
+        "asia_europe_cape",
+        "Asia–Europe via Cape of Good Hope",
+        "Shanghai → Singapore → Malacca → Indian Ocean → Cape → Rotterdam (Suez bypass, longer, lower chokepoint risk).",
+        ["shanghai", "taiwan_strait", "singapore", "strait_of_malacca", "indian_ocean", "cape_of_good_hope", "english_channel", "rotterdam"],
     ),
     Route(
-        "dubai",
-        "Route C - Dubai Transshipment",
-        "Suez to Dubai transshipment then direct to Mumbai (west coast).",
-        ["frankfurt", "european_hub", "suez", "dubai", "mumbai", "customs", "final_destination"],
+        "trans_pacific",
+        "Trans-Pacific Direct",
+        "Shanghai → Los Angeles (direct Pacific crossing).",
+        ["shanghai", "los_angeles"],
+    ),
+    Route(
+        "asia_us_east_panama",
+        "Asia–US East via Panama",
+        "Shanghai → Los Angeles → Panama Canal → New York (Pacific + Panama).",
+        ["shanghai", "los_angeles", "panama_canal", "new_york"],
     ),
 ]
 
-DEFAULT_ROUTE = "suez"
+DEFAULT_ROUTE = "asia_europe_suez"
 
-# Node kinds that are most sensitive to risk (used for critical-node analysis).
-RISK_PRONE_KINDS = {"canal", "port", "customs", "transshipment"}
+RISK_PRONE_KINDS = {"canal", "strait", "port", "sea"}
 
 
 def node_index() -> Dict[str, Dict]:
