@@ -3,7 +3,7 @@ import Explanation from "../components/Explanation.jsx";
 import KeyDriversTrend from "../components/KeyDriversTrend.jsx";
 import TabState from "../components/TabState.jsx";
 
-export default function RiskContributorsView({ data }) {
+export default function RiskDriversView({ data }) {
   const { prediction, explanation, loading, apiError, onRetry } = data;
   const ready = Boolean(explanation);
 
@@ -11,7 +11,7 @@ export default function RiskContributorsView({ data }) {
     <div className="view-stack">
       <div className="view-head">
         <div>
-          <div className="view-title">Risk Contributors</div>
+          <div className="view-title">Risk Drivers</div>
           <div className="view-sub">Which factors push delay risk up or down</div>
         </div>
       </div>
@@ -29,6 +29,9 @@ export default function RiskContributorsView({ data }) {
         <>
           <section className="panel">
             <h2>Factor Attribution</h2>
+            <p className="muted">
+              Positive values increase risk. Negative values reduce risk relative to the baseline.
+            </p>
             <Explanation data={explanation} />
           </section>
 

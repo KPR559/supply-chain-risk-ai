@@ -1,18 +1,22 @@
 import React from "react";
+import { describeFactor } from "../models.js";
 
 function SignedBar({ name, contribution, max }) {
   const w = (Math.abs(contribution) / max) * 100;
   const push = contribution >= 0;
+  const friendly = describeFactor(name);
   return (
     <div className="shap-row">
-      <span className="shap-name">{name}</span>
+      <span className="shap-name" title={`Model feature: ${friendly.raw}`}>{friendly.label}</span>
       <div className="shap-track">
         <div
           className={`shap-fill ${push ? "push" : "pull"}`}
           style={{ width: `${Math.max(2, w)}%`, marginLeft: push ? "50%" : `${50 - w}%` }}
         />
       </div>
-      <span className="shap-val">{contribution >= 0 ? "+" : ""}{contribution.toFixed(2)}</span>
+      <span className="shap-val" title={push ? "Increases delay risk" : "Risk reducing — lowers delay risk relative to the baseline"}>
+        {contribution >= 0 ? "+" : ""}{contribution.toFixed(2)}{push ? "" : " · reducing"}
+      </span>
     </div>
   );
 }

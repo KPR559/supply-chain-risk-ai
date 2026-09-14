@@ -16,11 +16,12 @@ import RouteMapView from "./pages/RouteMapView.jsx";
 import CheckpointRiskView from "./pages/CheckpointRiskView.jsx";
 import ShipmentsView from "./pages/ShipmentsView.jsx";
 import EtaDistributionView from "./pages/EtaDistributionView.jsx";
-import DeadlineRiskView from "./pages/DeadlineRiskView.jsx";
-import CriticalCheckpointsView from "./pages/CriticalCheckpointsView.jsx";
-import RiskContributorsView from "./pages/RiskContributorsView.jsx";
+import RiskDriversView from "./pages/RiskDriversView.jsx";
 import WhatIfView from "./pages/WhatIfView.jsx";
 import CompareRoutesView from "./pages/CompareRoutesView.jsx";
+import SettingsView from "./pages/SettingsView.jsx";
+import Toast from "./components/Toast.jsx";
+import { loadUiPrefs } from "./prefs.js";
 
 
 const DEFAULT_ROUTE = "suez";
@@ -32,12 +33,10 @@ const VIEWS = {
   checkpoints: CheckpointRiskView,
   shipments: ShipmentsView,
   eta: EtaDistributionView,
-  deadline: DeadlineRiskView,
-  critical: CriticalCheckpointsView,
-  contributors: RiskContributorsView,
+  contributors: RiskDriversView,
   simulator: WhatIfView,
   compare: CompareRoutesView,
-
+  settings: SettingsView,
 };
 
 export default function App() {
@@ -57,6 +56,20 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const toastTimer = React.useRef(null);
+
+  const notify = useCallback((msg) => {
+    try {
+      if (loadUiPrefs().toasts === false) return;
+    } catch {
+      // fall through — show the toast
+    }
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, key: Date.now() });
+    toastTimer.current = setTimeout(() => setToast(null), 2800);
+  }, []);
 
   const loadRoutes = useCallback(async () => {
     try {
@@ -280,6 +293,20 @@ export default function App() {
     };
   }, []);
 
+  const changeSim = (simCount) => {
+    setNSim(simCount);
+    loadBase(route, simCount, selectedShipment?.requiredDate || null);
+  };
+
+  // Apply the saved display density (Settings → Display).
+  useEffect(() => {
+    try {
+      document.body.dataset.density = loadUiPrefs().density || "comfortable";
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const ViewComponent = VIEWS[view] || PredictionResultsView;
   const data = {
     prediction,
@@ -289,11 +316,21 @@ export default function App() {
     dq,
     routesMeta,
     route,
+    nSim,
+    onSimChange: changeSim,
     shipments,
     selectedId,
     selectedShipment,
     loading,
     apiError: error,
+    lastUpdated,
+    user,
+    onLogout: handleLogout,
+    onDeleteAccount: handleDeleteAccount,
+    onNavigate: setView,
+    notify,
+    alertsOpen,
+    setAlertsOpen,
     onRetry: () => loadBase(route, nSim, selectedShipment?.requiredDate || null),
     onSelectShipment: selectShipment,
     onAddShipment: addShipment,
@@ -307,7 +344,16 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar active={view} onSelect={setView} user={user} onLogout={handleLogout} onDeleteAccount={handleDeleteAccount} />
+      <Sidebar
+        active={view}
+        onSelect={setView}
+        user={user}
+        onLogout={handleLogout}
+        onOpenAlerts={() => {
+          setView("results");
+          setAlertsOpen(true);
+        }}
+      />
       <div className="main-area">
         <MobileNav active={view} onSelect={setView} onLogout={handleLogout} />
         <Header
@@ -316,13 +362,17 @@ export default function App() {
           onSelectShipment={selectShipment}
           loading={loading}
           lastUpdated={lastUpdated}
-          onRefresh={() => loadBase(route, nSim, selectedShipment?.requiredDate || null)}
+          onRefresh={() => {
+            loadBase(route, nSim, selectedShipment?.requiredDate || null);
+            notify("Refreshing shipment intelligence…");
+          }}
           prediction={prediction}
         />
 
         {loading && !prediction && <div className="loading-bar" />}
 
         <ViewComponent data={data} />
+        <Toast toast={toast} />
       </div>
     </div>
   );

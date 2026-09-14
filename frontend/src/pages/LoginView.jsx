@@ -246,10 +246,7 @@ export default function LoginView({ onLogin, onRegister }) {
               password: min 8 characters.
             </p>
           ) : (
-            <p className="login-hint">
-              Demo credentials — username <code>{DEFAULT_CREDENTIALS.username}</code>
-              {" · "}password <code>{DEFAULT_CREDENTIALS.password}</code>
-            </p>
+            null
           )}
 
           <label className="remember-row">

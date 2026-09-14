@@ -1,4 +1,5 @@
 import React from "react";
+import { RefreshCw } from "lucide-react";
 
 export default function Header({
   shipments,
@@ -34,8 +35,14 @@ export default function Header({
         <div className="last-updated">
           <span>Last Updated</span>
           <time>{lastUpdated || "—"}</time>
-          <button className="refresh-btn" onClick={onRefresh} disabled={loading} title="Refresh">
-            ↻
+          <button
+            className="refresh-btn"
+            onClick={onRefresh}
+            disabled={loading}
+            title={loading ? "Refreshing…" : "Refresh shipment intelligence"}
+            aria-label={loading ? "Refreshing" : "Refresh"}
+          >
+            <RefreshCw size={15} aria-hidden="true" className={loading ? "spin" : ""} />
           </button>
         </div>
       </div>

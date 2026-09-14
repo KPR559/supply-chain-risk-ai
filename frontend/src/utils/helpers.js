@@ -1,7 +1,7 @@
 export function riskColor(prob) {
-  if (prob >= 0.6) return "#f44336";
-  if (prob >= 0.35) return "#ffb300";
-  return "#26a69a";
+  if (prob >= 0.6) return "#ef4444";
+  if (prob >= 0.35) return "#f59e0b";
+  return "#22c55e";
 }
 
 export function riskClass(prob) {
@@ -57,4 +57,4 @@ export function delayDaysFromHours(hours) {
   return d >= 0 ? `+${d.toFixed(1)} days` : `${d.toFixed(1)} days`;
 }
 
-export const DONUT_COLORS = ["#4cc2ff", "#ffb300", "#f44336", "#26a69a", "#ab47bc", "#78909c"];
+export const DONUT_COLORS = ["#38bdf8", "#f59e0b", "#ef4444", "#22c55e", "#a78bfa", "#78909c"];

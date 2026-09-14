@@ -49,7 +49,7 @@ export default function KeyDriversTrend({ explanation, nodes }) {
             <td>{item.name}</td>
             <td className="mono">{item.index}</td>
             <td>
-              <Sparkline data={item.trend} color="#ffb300" width={72} height={22} />
+              <Sparkline data={item.trend} color="#f59e0b" width={72} height={22} />
             </td>
           </tr>
         ))}

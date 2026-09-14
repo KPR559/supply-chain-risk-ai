@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape from "cytoscape";
+import { feature } from "topojson-client";
+import { Maximize2, Minus, Plus } from "lucide-react";
+import landTopo from "world-atlas/land-110m.json";
 import { api } from "../api.js";
 import { riskColor, riskClass } from "../utils/helpers.js";
+import { loadUiPrefs } from "../prefs.js";
 
 const SHORT_NAMES = { suez: "Suez", cape: "Cape", dubai: "Dubai" };
 const KIND_LABELS = {
@@ -18,6 +22,15 @@ const KIND_LABELS = {
 const VIEW_W = 1000;
 const VIEW_H = 460;
 
+// Fixed equirectangular corridor window (Europe → India via Suez/Cape/Dubai).
+// Node extremes: lon 4.4–79.9, lat −34.4–51.9 — all sit inside with margin.
+const LON_MIN = -15;
+const LON_MAX = 95;
+const LAT_MIN = -40;
+const LAT_MAX = 57;
+const wx = (lon) => ((lon - LON_MIN) / (LON_MAX - LON_MIN)) * VIEW_W;
+const wy = (lat) => (1 - (lat - LAT_MIN) / (LAT_MAX - LAT_MIN)) * VIEW_H;
+
 const CY_STYLE = [
   {
     selector: "node",
@@ -26,7 +39,7 @@ const CY_STYLE = [
       height: 30,
       "background-opacity": 0.95,
       label: "data(label)",
-      color: "#7a90ad",
+      color: "#94a3b8",
       "font-size": 10,
       "font-family": "Inter, system-ui, sans-serif",
       "text-valign": "bottom",
@@ -37,9 +50,9 @@ const CY_STYLE = [
       "z-index": 10,
     },
   },
-  { selector: "node.risk-low", style: { "background-color": "#26a69a" } },
-  { selector: "node.risk-med", style: { "background-color": "#ffb300" } },
-  { selector: "node.risk-high", style: { "background-color": "#f44336" } },
+  { selector: "node.risk-low", style: { "background-color": "#22c55e" } },
+  { selector: "node.risk-med", style: { "background-color": "#f59e0b" } },
+  { selector: "node.risk-high", style: { "background-color": "#ef4444" } },
   { selector: "node.kind-origin", style: { shape: "round-rectangle", width: 34, height: 34 } },
   { selector: "node.kind-destination", style: { shape: "star", width: 34, height: 34 } },
   { selector: "node.kind-customs", style: { shape: "diamond", width: 26, height: 26 } },
@@ -51,12 +64,12 @@ const CY_STYLE = [
     selector: "edge",
     style: {
       width: 2.2,
-      "line-color": "#26a69a",
+      "line-color": "#22c55e",
       "curve-style": "bezier",
       "line-cap": "round",
       label: "data(label)",
       "font-size": 8.5,
-      color: "#7a90ad",
+      color: "#94a3b8",
       "text-background-color": "#0b1524",
       "text-background-opacity": 0.75,
       "text-background-padding": 2,
@@ -64,8 +77,8 @@ const CY_STYLE = [
   },
   { selector: "edge.mode-sea", style: { "line-style": "dashed" } },
   { selector: "edge.mode-port", style: { "line-style": "dotted" } },
-  { selector: "edge.risk-med", style: { "line-color": "#ffb300" } },
-  { selector: "edge.risk-high", style: { "line-color": "#f44336" } },
+  { selector: "edge.risk-med", style: { "line-color": "#f59e0b" } },
+  { selector: "edge.risk-high", style: { "line-color": "#ef4444" } },
   { selector: "edge.route-active", style: { width: 2.4, opacity: 0.85 } },
   { selector: "edge.route-alt", style: { "line-color": "#3d4d6d", width: 1.5, opacity: 0.35 } },
 ];
@@ -76,8 +89,36 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
   const [visible, setVisible] = useState({});
   const [hover, setHover] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [layout, setLayout] = useState(() => (loadUiPrefs().mapLayout === "graph" ? "graph" : "world")); // 'world' | 'graph'
+  const [view, setView] = useState({ x: 0, y: 0, z: 1 }); // shared cy pan/zoom for the bg layer
   const wrapRef = useRef(null);
   const cyRef = useRef(null);
+
+  // Continent silhouettes (world-atlas land-110m + topojson-client),
+  // projected once through the same corridor projection as the nodes.
+  const landPath = useMemo(() => {
+    try {
+      const fc = feature(landTopo, landTopo.objects.land);
+      const parts = [];
+      const pushRing = (ring) => {
+        if (!ring || ring.length < 4) return;
+        parts.push(
+          "M" + ring.map(([lo, la]) => `${wx(lo).toFixed(1)},${wy(la).toFixed(1)}`).join("L") + "Z"
+        );
+      };
+      for (const f of fc.features || []) {
+        const g = f.geometry;
+        if (!g) continue;
+        if (g.type === "Polygon") g.coordinates.forEach(pushRing);
+        else if (g.type === "MultiPolygon") g.coordinates.forEach((poly) => poly.forEach(pushRing));
+      }
+      return parts.join("");
+    } catch {
+      return "";
+    }
+  }, []);
+
+
   const sizeRef = useRef({ width: 800, height: 460 });
 
   useEffect(() => {
@@ -113,7 +154,6 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
       autounselectify: true,
       minZoom: 0.4,
       maxZoom: 3,
-      wheelSensitivity: 0.2,
     });
     cy.style(CY_STYLE);
     cy.on("tap", (e) => {
@@ -142,14 +182,20 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
       });
     });
     cy.on("mouseout", "node,edge", () => setHover(null));
+    cy.on("pan zoom", () => {
+      const p = cy.pan();
+      setView({ x: p.x, y: p.y, z: cy.zoom() });
+    });
     cyRef.current = cy;
     const onResize = () => {
       if (wrapRef.current) {
         const r = wrapRef.current.getBoundingClientRect();
         sizeRef.current = { width: r.width, height: r.height };
       }
+      cy.resize();
     };
     onResize();
+    requestAnimationFrame(() => cy.resize());
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
@@ -181,28 +227,38 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
       }
     }
     const flat = Object.values(m);
-    const useGeo = flat.some((n) => !n.hasPos);
-    let minLon = Infinity;
-    let maxLon = -Infinity;
-    let minLat = Infinity;
-    let maxLat = -Infinity;
-    if (useGeo) {
+    if (layout === "world") {
+      // Equirectangular lon/lat → VIEW space, fixed corridor crop.
       for (const n of flat) {
-        minLon = Math.min(minLon, n.lon);
-        maxLon = Math.max(maxLon, n.lon);
-        minLat = Math.min(minLat, n.lat);
-        maxLat = Math.max(maxLat, n.lat);
+        n.px = wx(n.lon);
+        n.py = wy(n.lat);
       }
-    }
-    const padLon = Math.max((maxLon - minLon) * 0.06, 3);
-    const padLat = Math.max((maxLat - minLat) * 0.08, 3);
-    for (const n of flat) {
-      if (n.hasPos) {
-        n.px = n.posx * VIEW_W;
-        n.py = (1 - n.posy) * VIEW_H;
-      } else {
-        n.px = ((n.lon - minLon + padLon) / (maxLon - minLon + 2 * padLon)) * VIEW_W;
-        n.py = (1 - (n.lat - minLat + padLat) / (maxLat - minLat + 2 * padLat)) * VIEW_H;
+    } else {
+      // Graph schematic (NetworkX spring layout seeded from geo); fall back to a
+      // data-fitted geo projection for any node missing NetworkX pos.
+      const useGeo = flat.some((n) => !n.hasPos);
+      let minLon = Infinity;
+      let maxLon = -Infinity;
+      let minLat = Infinity;
+      let maxLat = -Infinity;
+      if (useGeo) {
+        for (const n of flat) {
+          minLon = Math.min(minLon, n.lon);
+          maxLon = Math.max(maxLon, n.lon);
+          minLat = Math.min(minLat, n.lat);
+          maxLat = Math.max(maxLat, n.lat);
+        }
+      }
+      const padLon = Math.max((maxLon - minLon) * 0.06, 3);
+      const padLat = Math.max((maxLat - minLat) * 0.08, 3);
+      for (const n of flat) {
+        if (n.hasPos) {
+          n.px = n.posx * VIEW_W;
+          n.py = (1 - n.posy) * VIEW_H;
+        } else {
+          n.px = ((n.lon - minLon + padLon) / (maxLon - minLon + 2 * padLon)) * VIEW_W;
+          n.py = (1 - (n.lat - minLat + padLat) / (maxLat - minLat + 2 * padLat)) * VIEW_H;
+        }
       }
     }
     for (const p of nodes) {
@@ -222,7 +278,7 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
       };
     }
     return m;
-  }, [routes, nodes]);
+  }, [routes, nodes, layout]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -273,18 +329,28 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
       }
     }
     cy.endBatch();
+    cy.resize();
     cy.layout({ name: "preset", fit: true, padding: 45 }).run();
-  }, [routes, visible, activeRouteId, merged]);
+    const p = cy.pan();
+    setView({ x: p.x, y: p.y, z: cy.zoom() });
+  }, [routes, visible, activeRouteId, merged, layout]);
 
   const toggle = (rid) => setVisible((v) => ({ ...v, [rid]: !v[rid] }));
 
-  if (failed && !routes.length) {
-    return <div className="placeholder">Route map unavailable — the map request failed.</div>;
-  }
-
-  if (!routes.length) {
-    return <div className="placeholder">Loading route map…</div>;
-  }
+  const zoomBy = (factor) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const el = wrapRef.current?.getBoundingClientRect();
+    cy.zoom({
+      level: Math.min(3, Math.max(0.4, cy.zoom() * factor)),
+      renderedPosition: el ? { x: el.width / 2, y: el.height / 2 } : undefined,
+    });
+  };
+  const fitView = () => {
+    const cy = cyRef.current;
+    if (!cy || !cy.elements().length) return;
+    cy.fit(cy.elements(), 45);
+  };
 
   const hoverNode = hover?.kind === "node" ? merged[hover.nid] : null;
   const flip = hover?.pos && hover.pos.x > sizeRef.current.width - 190;
@@ -311,10 +377,38 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
             </button>
           );
         })}
+        <span className="seg" role="group" aria-label="Map layout">
+          <button className={`seg-btn ${layout === "world" ? "on" : ""}`} onClick={() => setLayout("world")} title="Geographic world map (lon/lat projection)">World</button>
+          <button className={`seg-btn ${layout === "graph" ? "on" : ""}`} onClick={() => setLayout("graph")} title="Graph schematic layout">Graph</button>
+        </span>
       </div>
 
-      <div className="map-container map-cv" ref={wrapRef}>
-        {hover && (
+      <div className={`map-container ${layout === "world" ? "world" : ""}`}>
+        {layout === "world" && (
+          <svg className="map-bg" aria-hidden="true">
+            <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
+              <path d={landPath} className="map-land" fillRule="evenodd" />
+            </g>
+          </svg>
+        )}
+        <div className="map-cv" ref={wrapRef} />
+        <div className="map-ctl" role="group" aria-label="Map controls">
+          <button className="icon-btn" onClick={() => zoomBy(1.25)} title="Zoom in" aria-label="Zoom in">
+            <Plus size={15} aria-hidden="true" />
+          </button>
+          <button className="icon-btn" onClick={() => zoomBy(0.8)} title="Zoom out" aria-label="Zoom out">
+            <Minus size={15} aria-hidden="true" />
+          </button>
+          <button className="icon-btn" onClick={fitView} title="Fit route in view" aria-label="Fit route in view">
+            <Maximize2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+        {!routes.length && (
+          <div className="map-status">
+            {failed ? "Route map unavailable — the map request failed." : "Loading route map…"}
+          </div>
+        )}
+        {hover?.pos && (
           <div
             className={`map-tip ${flip ? "flip" : ""}`}
             style={{ left: hover.pos.x, top: hover.pos.y }}
@@ -362,7 +456,7 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
         <span className="legend-mode solid">road</span>
         <span className="legend-mode dashed">sea</span>
         <span className="legend-mode dotted">port</span>
-        <span className="legend-hint">layout: NetworkX ↗ Cytoscape.js · scroll to zoom · click a node to inspect</span>
+        <span className="legend-hint">layout: {layout === "world" ? "World map (lon/lat) ↗ Cytoscape.js" : "Graph ↗ Cytoscape.js"} · scroll to zoom · click a node to inspect</span>
       </div>
 
       {selected && merged[selected] && (

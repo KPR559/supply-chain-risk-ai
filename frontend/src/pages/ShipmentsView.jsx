@@ -1,133 +1,50 @@
-import React, { useState } from "react";
-import RecentShipments from "../components/RecentShipments.jsx";
-import CheckpointCards from "../components/CheckpointCards.jsx";
-import AlertsPanel from "../components/AlertsPanel.jsx";
+import React, { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import TabState from "../components/TabState.jsx";
-import {
-  blankShipment,
-  PRIORITIES,
-  ROUTE_IDS,
-  STATUSES,
-} from "../shipments.js";
-import {
-  delayDaysFromHours,
-  formatDate,
-  routeDisplayName,
-} from "../utils/helpers.js";
+import ShipmentFormModal from "../components/ShipmentFormModal.jsx";
+import ConfirmationDialog from "../components/ConfirmationDialog.jsx";
+import CheckpointTimeline from "../components/CheckpointTimeline.jsx";
+import DelayRiskTable from "../components/DelayRiskTable.jsx";
+import AlertCard from "../components/AlertCard.jsx";
+import { buildAlertList, dismissAlert, loadDismissedIds, loadReadIds, markAlertRead } from "../alerts.js";
+import { fmtDays, fmtDelayDays, fmtPct, riskBand, statusClass } from "../models.js";
+import { formatDate } from "../utils/helpers.js";
 
-const FIELD_DEFS = [
-  ["id", "Shipment ID", "text", "SHP004"],
-  ["origin", "Origin", "text", "Frankfurt, Germany"],
-  ["destination", "Destination", "text", "Mumbai, India"],
-  ["type", "Shipment Type", "text", "Automotive Parts"],
-  ["mode", "Transport Mode", "text", "Sea + Road"],
-  ["departureDate", "Departure Date", "date", ""],
-  ["etaDate", "Expected Arrival Date", "date", ""],
-  ["requiredDate", "Required Delivery Date", "date", ""],
-  ["location", "Current Location", "text", "Hamburg Port"],
-];
-
-const INFO_ROWS = [
-  ["id", "Shipment ID"],
-  ["origin", "Origin"],
-  ["destination", "Destination"],
-  ["type", "Shipment Type"],
-  ["mode", "Transport Mode"],
-  ["departureDate", "Departure Date", true],
-  ["etaDate", "Expected Arrival Date", true],
-  ["requiredDate", "Required Delivery Date", true],
-  ["priority", "Cargo Priority"],
-  ["location", "Current Location"],
-  ["status", "Current Status"],
-];
-
-function ShipmentForm({ shipments, routesMeta, initial, onSubmit, onCancel }) {
-  const isEdit = Boolean(initial);
-  const [form, setForm] = useState(() => (initial ? { ...initial } : blankShipment()));
-  const [errors, setErrors] = useState({});
-
-  const set = (key, value) => {
-    setForm((f) => ({ ...f, [key]: value }));
-    setErrors((e) => ({ ...e, [key]: null }));
-  };
-
-  const routeName = (rid) =>
-    routesMeta.find((r) => r.route_id === rid)?.name ||
-    routeDisplayName(rid);
-
-  const submit = (e) => {
-    e.preventDefault();
-    const errs = {};
-    const id = form.id.trim();
-    if (!id) errs.id = "Shipment ID is required.";
-    else if (
-      !isEdit &&
-      shipments.some((s) => s.id.toLowerCase() === id.toLowerCase())
-    )
-      errs.id = "This Shipment ID already exists.";
-    if (!form.origin.trim()) errs.origin = "Origin is required.";
-    if (!form.destination.trim()) errs.destination = "Destination is required.";
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-    onSubmit({
-      ...form,
-      id,
-      origin: form.origin.trim(),
-      destination: form.destination.trim(),
-      type: form.type.trim(),
-      mode: form.mode.trim(),
-      location: form.location.trim(),
-    });
-  };
-
+function OpKpi({ label, value, sub, hint }) {
   return (
-    <form className="panel ship-form" onSubmit={submit}>
-      <h2>{isEdit ? `Edit Shipment ${initial.id}` : "Add Shipment"}</h2>
-      <div className="form-grid">
-        {FIELD_DEFS.map(([key, label, type, placeholder]) => (
-          <label key={key} className="form-field">
-            <span>{label}</span>
-            <input
-              type={type}
-              value={form[key]}
-              placeholder={placeholder}
-              disabled={isEdit && key === "id"}
-              title={isEdit && key === "id" ? "Shipment ID cannot be changed" : undefined}
-              onChange={(e) => set(key, e.target.value)}
-            />
-            {errors[key] && <em className="form-error">{errors[key]}</em>}
-          </label>
-        ))}
-        <label className="form-field">
-          <span>Cargo Priority</span>
-          <select value={form.priority} onChange={(e) => set("priority", e.target.value)}>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Current Status</span>
-          <select value={form.status} onChange={(e) => set("status", e.target.value)}>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Corridor Route (for prediction)</span>
-          <select value={form.routeId} onChange={(e) => set("routeId", e.target.value)}>
-            {ROUTE_IDS.map((r) => (
-              <option key={r} value={r}>{routeName(r)}</option>
-            ))}
-          </select>
-        </label>
+    <div className="kpi-card" title={hint || undefined}>
+      <div className="kpi-top">
+        <span className="kpi-label">{label}</span>
       </div>
-      <div className="form-actions">
-        <button className="btn" type="submit">{isEdit ? "Save changes" : "Add shipment"}</button>
-        <button className="btn ghost" type="button" onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
+      <div className="kpi-value">{value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function RowMenu({ onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="row-menu">
+      <button
+        className="btn ghost mini-btn"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="More actions"
+      >
+        ⋯
+      </button>
+      {open && (
+        <>
+          <span className="menu-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
+          <span className="row-dropdown" role="menu">
+            <button role="menuitem" onClick={() => { setOpen(false); onEdit(); }}>Edit</button>
+            <button role="menuitem" className="danger" onClick={() => { setOpen(false); onDelete(); }}>Delete…</button>
+          </span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -145,191 +62,300 @@ export default function ShipmentsView({ data }) {
     loading,
     apiError,
     onRetry,
+    lastUpdated,
+    onNavigate,
+    notify,
   } = data;
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const editingShipment = editingId ? list.find((s) => s.id === editingId) || null : null;
 
-  const openAdd = () => {
-    setEditingId(null);
-    setShowForm((v) => !v);
-  };
-  const openEdit = (id) => {
-    setShowForm(false);
-    setEditingId(id);
-  };
-  const closeForm = () => {
-    setShowForm(false);
-    setEditingId(null);
-  };
+  const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [readIds, setReadIds] = useState(() => loadReadIds());
+  const [dismissedIds, setDismissedIds] = useState(() => loadDismissedIds());
+
+  const list = shipments || [];
   const mc = prediction?.monte_carlo;
   const nodes = prediction?.node_predictions || [];
-  const list = shipments || [];
+  const band = nodes.length ? riskBand(nodes, mc) : null;
+  const alerts = useMemo(
+    () => buildAlertList({ prediction, explanation: data.explanation, critical: data.critical }),
+    [prediction, data.explanation, data.critical]
+  );
+  const visibleAlerts = alerts.filter((a) => !dismissedIds.has(a.id));
+
+  const submitAdd = (fields) => {
+    onAddShipment(fields);
+    setAddOpen(false);
+    if (notify) notify(`${fields.id} added to the local demo registry.`);
+  };
+  const submitEdit = (fields) => {
+    onEditShipment(editing.id, fields);
+    setEditing(null);
+    if (notify) notify(`${fields.id} updated.`);
+  };
+  const confirmDelete = () => {
+    onDeleteShipment(deleteTarget.id);
+    if (notify) notify(`${deleteTarget.id} removed from the local registry.`);
+    setDeleteTarget(null);
+  };
 
   return (
     <div className="view-stack">
       <div className="view-head">
         <div>
-          <div className="view-title">Shipments</div>
-          <div className="view-sub">Each shipment keeps its own independent record</div>
+          <div className="view-title">Shipment Status</div>
+          <div className="view-sub">Track shipment progress, operational status, and checkpoint-level risk.</div>
         </div>
-        <button className="btn" onClick={openAdd}>
-          {showForm && !editingShipment ? "Close form" : "+ Add shipment"}
+        <button className="btn" onClick={() => setAddOpen(true)}>
+          <Plus size={14} aria-hidden="true" /> Add Shipment
         </button>
       </div>
 
-      {showForm && !editingShipment && (
-        <ShipmentForm
-          shipments={list}
-          routesMeta={routesMeta}
-          onSubmit={(fields) => {
-            onAddShipment(fields);
-            closeForm();
-          }}
-          onCancel={closeForm}
-        />
-      )}
-
-      {editingShipment && (
-        <ShipmentForm
-          key={editingShipment.id}
-          shipments={list}
-          routesMeta={routesMeta}
-          initial={editingShipment}
-          onSubmit={(fields) => {
-            onEditShipment(editingShipment.id, fields);
-            closeForm();
-          }}
-          onCancel={closeForm}
-        />
-      )}
-
       <section className="panel">
-        <h2>Current Shipment</h2>
+        <div className="panel-head">
+          <h2>Current Shipment</h2>
+          <div className="head-badges">
+            {selectedShipment && (
+              <span className={`risk-pill ${statusClass(selectedShipment.status)}`}>
+                {selectedShipment.status}
+              </span>
+            )}
+            {band && (
+              <span className={`risk-pill ${band.band === "critical" ? "high" : band.band}`}>
+                {band.label} risk
+              </span>
+            )}
+            {lastUpdated && <span className="muted">Last updated {lastUpdated}</span>}
+          </div>
+        </div>
         <TabState
           loading={loading}
           error={apiError}
           onRetry={onRetry}
           empty={!loading && !apiError && !selectedShipment}
-          emptyText="No shipments yet — add your first shipment above."
+          emptyText="No shipments yet — add your first shipment to start tracking."
           loadingText="Loading shipment prediction…"
         />
         {selectedShipment && !loading && !apiError && (
-          <div className="shipment-card">
-            <div className="shipment-card-main">
-              <div className="shipment-idh">
-                {selectedShipment.id} · {selectedShipment.origin} → {selectedShipment.destination}
-              </div>
-              <dl className="ship-grid">
-                {INFO_ROWS.map(([key, label, isDate]) => (
-                  <div key={key} className="ship-row">
-                    <dt>{label}</dt>
-                    <dd>
-                      {isDate
-                        ? formatDate(selectedShipment[key])
-                        : selectedShipment[key] || "—"}
-                    </dd>
-                  </div>
+          <>
+            <div className="summary-route">
+              <span className="summary-stop">
+                <span className="summary-stop-label">Origin</span>
+                <span className="summary-stop-value">{selectedShipment.origin || "Not available"}</span>
+              </span>
+              <span className="summary-connector" aria-hidden="true">
+                <span className="summary-line" />
+                <span className="summary-stop-label">{selectedShipment.location || "En route"}</span>
+                <span className="summary-line" />
+              </span>
+              <span className="summary-stop">
+                <span className="summary-stop-label">Destination</span>
+                <span className="summary-stop-value">{selectedShipment.destination || "Not available"}</span>
+              </span>
+            </div>
+
+            <dl className="meta-grid">
+              {[
+                ["Shipment ID", selectedShipment.id || "Not available", true, "Unique identifier for this shipment record."],
+                ["Shipment Type", selectedShipment.type || "Not available", false, "Cargo category declared on the shipment record."],
+                ["Transport Mode", selectedShipment.mode || "Not available", false, "Transport modes used along the corridor."],
+                ["Departure Date", selectedShipment.departureDate ? formatDate(selectedShipment.departureDate) : "Not available", false, "Planned departure date from the origin."],
+                ["Required Delivery Date", selectedShipment.requiredDate ? formatDate(selectedShipment.requiredDate) : "Not available", false, "Customer-required delivery date; drives the deadline miss risk."],
+                ["Cargo Priority", selectedShipment.priority || "Not available", false, "Operational priority of the cargo."],
+              ].map(([label, value, mono, hint]) => (
+                <div key={label} className="meta-cell" title={hint}>
+                  <dt>{label}</dt>
+                  <dd className={mono ? "mono" : ""}>{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="op-grid">
+              <OpKpi
+                label="Predicted Arrival"
+                value={mc?.expected_eta_date ? formatDate(mc.expected_eta_date) : "Not available"}
+                sub={mc?.expected_days != null ? `Transit duration ${fmtDays(mc.expected_days)}` : "Risk-adjusted arrival date"}
+                hint="Most likely arrival date from the simulated distribution."
+              />
+              <OpKpi
+                label="Expected Delay"
+                value={mc?.expected_delay_hours != null ? fmtDelayDays(mc.expected_delay_hours) : "Not available"}
+                sub="Compared with the baseline route estimate"
+                hint="Expected additional delay compared with the baseline route estimate."
+              />
+              <OpKpi
+                label="Deadline Miss Risk"
+                value={mc?.deadline_date != null ? fmtPct(mc?.p_miss_deadline) : "Not available"}
+                sub={mc?.deadline_date ? `Customer deadline ${formatDate(mc.deadline_date)}` : "No deadline set"}
+                hint="Estimated probability that the shipment will arrive after the customer deadline."
+              />
+              <OpKpi
+                label="P90 Arrival"
+                value={mc?.eta_date?.p90 ? formatDate(mc.eta_date.p90) : "Not available"}
+                sub="90% probability of arriving on or before this date"
+                hint="P90 arrival: 90% probability of arriving on or before this date."
+              />
+              <OpKpi
+                label="Simulations"
+                value={mc?.n_simulations?.toLocaleString() ?? "Not available"}
+                sub="Monte Carlo runs"
+                hint="Number of simulated shipment outcomes used to estimate arrival uncertainty."
+              />
+            </div>
+          </>
+        )}
+      </section>
+
+      {selectedShipment && !loading && !apiError && (
+        <section className="panel">
+          <h2>Checkpoint Progress</h2>
+          <CheckpointTimeline
+            nodes={nodes}
+            location={selectedShipment.location}
+            onDetails={onNavigate ? () => onNavigate("checkpoints") : null}
+          />
+        </section>
+      )}
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2>All Shipments ({list.length})</h2>
+        </div>
+        {list.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-title">No shipments yet</div>
+            <div className="muted">Add your first shipment to start tracking.</div>
+            <button className="btn" onClick={() => setAddOpen(true)} style={{ marginTop: 10 }}>
+              <Plus size={14} aria-hidden="true" /> Add Shipment
+            </button>
+          </div>
+        ) : (
+          <div className="table-scroll">
+            <table className="data-table recent-table">
+              <thead>
+                <tr>
+                  <th>Shipment ID</th>
+                  <th>Route</th>
+                  <th>Shipment Type</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Current Location</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((s) => (
+                  <tr key={s.id} className={s.id === selectedId ? "highlight-row" : ""}>
+                    <td className="mono">{s.id}</td>
+                    <td>{s.origin} → {s.destination}</td>
+                    <td>{s.type || "Not available"}</td>
+                    <td>
+                      <span className={`risk-pill ${s.priority === "Critical" ? "high" : s.priority === "High" ? "med" : "low"}`}>
+                        {s.priority}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`risk-pill ${statusClass(s.status)}`}>{s.status}</span>
+                    </td>
+                    <td>{s.location || "Not tracked"}</td>
+                    <td className="table-actions">
+                      {s.id !== selectedId && (
+                        <button className="btn ghost mini-btn" onClick={() => onSelectShipment(s.id)}>
+                          View
+                        </button>
+                      )}
+                      <RowMenu onEdit={() => setEditing(s)} onDelete={() => setDeleteTarget(s)} />
+                    </td>
+                  </tr>
                 ))}
-              </dl>
-              <div className="shipment-detail">
-                <span>Expected arrival <b>{mc?.expected_days?.toFixed(1)} d</b></span>
-                <span>P90 <b>{mc?.percentiles?.p90?.toFixed(1)} d</b></span>
-                <span>Expected delay <b>{delayDaysFromHours(mc?.expected_delay_hours)}</b></span>
-                <span>
-                  Deadline miss risk{" "}
-                  <b>
-                    {mc?.deadline_date
-                      ? `${Math.round((mc?.p_miss_deadline ?? 0) * 100)}%`
-                      : "—"}
-                  </b>
-                </span>
-                <span>
-                  Required{" "}
-                  <b>{formatDate(mc?.deadline_date || selectedShipment.requiredDate)}</b>
-                </span>
-                <span>{mc?.n_simulations?.toLocaleString()} simulations</span>
-              </div>
-            </div>
-            <div className="shipment-card-route">
-              <CheckpointCards nodes={nodes} />
-            </div>
+              </tbody>
+            </table>
           </div>
         )}
       </section>
 
       <section className="panel">
-        <h2>All Shipments ({list.length})</h2>
-        {list.length === 0 ? (
-          <p className="muted">Registry is empty.</p>
+        <h2>Delay Risk</h2>
+        {apiError && !prediction ? (
+          <TabState
+            error={apiError}
+            onRetry={onRetry}
+            loading={false}
+            empty={false}
+            loadingText=""
+            emptyText=""
+          />
+        ) : loading && !prediction ? (
+          <div className="sk sk-line" />
         ) : (
-          <table className="data-table recent-table">
-            <thead>
-              <tr>
-                <th>Shipment ID</th>
-                <th>Route</th>
-                <th>Type</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Location</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((s) => (
-                <tr key={s.id} className={s.id === selectedId ? "highlight-row" : ""}>
-                  <td className="mono">{s.id}</td>
-                  <td>{s.origin} → {s.destination}</td>
-                  <td>{s.type || "—"}</td>
-                  <td>{s.priority}</td>
-                  <td>{s.status}</td>
-                  <td>{s.location || "—"}</td>
-                  <td className="table-actions">
-                    {s.id !== selectedId && (
-                      <button
-                        className="btn ghost mini-btn"
-                        onClick={() => onSelectShipment(s.id)}
-                      >
-                        View
-                      </button>
-                    )}
-                    <button
-                      className="btn ghost mini-btn"
-                      onClick={() => openEdit(s.id)}
-                      title={`Edit ${s.id}`}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn danger mini-btn"
-                      onClick={() => onDeleteShipment(s.id)}
-                      title={`Delete ${s.id}`}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DelayRiskTable
+            shipments={list}
+            selectedId={selectedId}
+            prediction={prediction}
+            routesMeta={routesMeta}
+            onSelect={onSelectShipment}
+          />
         )}
       </section>
 
       <section className="panel">
-        <h2>Delay Risk</h2>
-        <RecentShipments
-          shipments={list}
-          selectedId={selectedId}
-          onSelect={onSelectShipment}
-          prediction={prediction}
-          routesMeta={routesMeta}
-        />
+        <h2>Early Warning Alerts</h2>
+        {apiError && !prediction ? (
+          <TabState
+            error={apiError}
+            onRetry={onRetry}
+            loading={false}
+            empty={false}
+            loadingText=""
+            emptyText=""
+          />
+        ) : loading && !prediction ? (
+          <>
+            <div className="sk sk-line" />
+            <div className="sk sk-line" />
+          </>
+        ) : visibleAlerts.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-title">No active alerts</div>
+            <div className="muted">All monitored shipment conditions are currently within the expected range.</div>
+          </div>
+        ) : (
+          visibleAlerts.map((a) => (
+            <AlertCard
+              key={a.id}
+              alert={a}
+              read={readIds.has(a.id)}
+              timeLabel={lastUpdated ? `Observed ${lastUpdated}` : null}
+              onRead={(id) => setReadIds(new Set(markAlertRead(id)))}
+              onDismiss={(id) => setDismissedIds(new Set(dismissAlert(id)))}
+              onAction={onNavigate}
+            />
+          ))
+        )}
       </section>
 
-      <section className="panel compact">
-        <h2>Early Warning Alerts</h2>
-        <AlertsPanel nodes={prediction?.node_predictions} />
-      </section>
+      <ShipmentFormModal
+        key={editing ? editing.id : "new"}
+        open={addOpen || Boolean(editing)}
+        initial={editing}
+        shipments={list}
+        routesMeta={routesMeta}
+        onSubmit={editing ? submitEdit : submitAdd}
+        onClose={() => {
+          setAddOpen(false);
+          setEditing(null);
+        }}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(deleteTarget)}
+        title={`Delete shipment ${deleteTarget?.id || ""}?`}
+        message={`${deleteTarget?.id || "This shipment"} and its local record will be removed.`}
+        note="Demo registry — this removes the local record only."
+        confirmLabel="Delete Shipment"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

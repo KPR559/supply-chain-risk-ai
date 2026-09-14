@@ -12,7 +12,7 @@ function MiniRoute({ routeId }) {
   };
   return (
     <svg width={36} height={18} className="mini-route">
-      <path d={paths[routeId] || paths.suez} fill="none" stroke="#4cc2ff" strokeWidth={1.5} />
+      <path d={paths[routeId] || paths.suez} fill="none" stroke="#38bdf8" strokeWidth={1.5} />
     </svg>
   );
 }
@@ -63,7 +63,7 @@ export default function ComparePanel({ prediction }) {
                 <th>ETA (P50)</th>
                 <th>P90 ETA</th>
                 <th>Delay Risk</th>
-                <th>Est. Cost</th>
+                <th>Distance</th>
                 <th>Resilience</th>
               </tr>
             </thead>
@@ -73,34 +73,35 @@ export default function ComparePanel({ prediction }) {
                 const resilience = Math.round(
                   Math.max(0, 100 - r.delay_probability * 55 - (r.uncertainty_days / 20) * 25)
                 );
-                const cost = Math.round(r.distance_km * 0.85 + r.expected_eta_days * 1200);
                 return (
                   <tr key={r.route_id} className={isBest ? "best-row" : ""}>
                     <td>{routeDisplayName(r.route_id)}</td>
                     <td><MiniRoute routeId={r.route_id} /></td>
-                    <td className="mono">{r.expected_eta_days?.toFixed(0)} Sep</td>
-                    <td className="mono">{r.p90_eta_days?.toFixed(0)} Sep</td>
+                    <td className="mono">{r.expected_eta_days != null ? `${r.expected_eta_days.toFixed(0)} days` : "Not available"}</td>
+                    <td className="mono">{r.p90_eta_days != null ? `${r.p90_eta_days.toFixed(0)} days` : "Not available"}</td>
                     <td>
                       <span className={`risk-pill ${riskClass(r.delay_probability)}`}>
                         {Math.round(r.delay_probability * 100)}%
                       </span>
                     </td>
-                    <td className="mono">${(cost / 1000).toFixed(0)}k</td>
-                    <td className="mono">{resilience}/100</td>
+                    <td className="mono">{r.distance_km != null ? `${Math.round(r.distance_km).toLocaleString()} km` : "Not available"}</td>
+                    <td className="mono" title="Frontend estimate from delay probability and uncertainty">{resilience}/100</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          {bestRoute && (
+          {bestRoute ? (
             <div className="recommendation-banner">
               <span className="rec-icon">★</span>
               <div>
                 <strong>Recommendation:</strong>{" "}
-                {routeDisplayName(bestRoute)} offers the best balance of risk, time, and cost
+                {routeDisplayName(bestRoute)} offers the best balance of risk and transit time
                 for this shipment corridor.
               </div>
             </div>
+          ) : (
+            <p className="muted">Recommendation unavailable — compare routes based on risk and ETA.</p>
           )}
         </>
       )}

@@ -85,24 +85,37 @@ export default function WhatIfPanel({ prediction }) {
           <input type="number" step="6" min="0" max="96" value={weather} onChange={(e) => setWeather(e.target.value)} />
         </label>
         <button className="btn ghost" onClick={applyCustom} disabled={running}>Apply</button>
+        {(result || error) && (
+          <button
+            className="btn ghost"
+            onClick={() => {
+              setResult(null);
+              setError(null);
+            }}
+            disabled={running}
+            title="Clear the scenario result"
+          >
+            Reset
+          </button>
+        )}
       </div>
       {error && <div className="banner error">What-if failed: {error}</div>}
       {result && (
         <div className="whatif-result">
           <div className="cmp-row">
             <span className="cmp-label">Baseline</span>
-            <span className="cmp-val">P90 {baselineP90?.toFixed(2)} d</span>
-            <span className="cmp-val">P50 {result.baseline?.percentiles?.p50?.toFixed(2)} d</span>
+            <span className="cmp-val">P90 {baselineP90 != null ? `${baselineP90.toFixed(2)} days` : "Not available"}</span>
+            <span className="cmp-val">P50 {result.baseline?.percentiles?.p50 != null ? `${result.baseline.percentiles.p50.toFixed(2)} days` : "Not available"}</span>
           </div>
           <div className="cmp-row highlight">
             <span className="cmp-label">{result.scenario}</span>
-            <span className="cmp-val">P90 {result.monte_carlo?.percentiles?.p90?.toFixed(2)} d</span>
-            <span className="cmp-val">P50 {result.monte_carlo?.percentiles?.p50?.toFixed(2)} d</span>
+            <span className="cmp-val">P90 {result.monte_carlo?.percentiles?.p90 != null ? `${result.monte_carlo.percentiles.p90.toFixed(2)} days` : "Not available"}</span>
+            <span className="cmp-val">P50 {result.monte_carlo?.percentiles?.p50 != null ? `${result.monte_carlo.percentiles.p50.toFixed(2)} days` : "Not available"}</span>
           </div>
           <div className="delta-row">
-            Δ expected <b>{result.delta_expected_days > 0 ? "+" : ""}{result.delta_expected_days} d</b>
+            Δ expected <b>{result.delta_expected_days != null ? `${result.delta_expected_days > 0 ? "+" : ""}${result.delta_expected_days} days` : "Not available"}</b>
             &nbsp;· Δ P90 <b className={result.delta_p90_days > 0 ? "up" : "down"}>
-            {result.delta_p90_days > 0 ? "+" : ""}{result.delta_p90_days} d</b>
+            {result.delta_p90_days != null ? `${result.delta_p90_days > 0 ? "+" : ""}${result.delta_p90_days} days` : "Not available"}</b>
           </div>
         </div>
       )}

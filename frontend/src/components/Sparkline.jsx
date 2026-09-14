@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function Sparkline({ data, color = "#4cc2ff", width = 80, height = 28, fill = false }) {
+export default function Sparkline({ data, color = "#38bdf8", width = 80, height = 28, fill = false }) {
   if (!data || data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
