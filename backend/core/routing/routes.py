@@ -52,13 +52,21 @@ def apply_scenario_to_quantiles(base_quantiles: Dict[str, Dict[str, float]],
         if close:
             # node effectively blocked -> huge delay
             nq = {"p50": 72.0, "p80": 96.0, "p90": 120.0}
+            if "p95" in q:
+                nq["p95"] = 144.0
             out[nid] = nq
             continue
-        base = {k: float(q.get(k, 0.0)) for k in ("p50", "p80", "p90")}
+        # Preserve any extra quantiles present (e.g. p95) so scenario runs
+        # sample the same CDF knot structure as the baseline - otherwise the
+        # tail interpolation differs and the comparison is not counterfactual.
+        keys = ("p50", "p80", "p90") + (("p95",) if "p95" in q else ())
+        base = {k: float(q.get(k, 0.0)) for k in keys}
         # Delay scales partly with congestion & conflict sensitivity.
+        # Symmetric treatment: mult > 1 worsens, mult < 1 relieves
+        # (counterfactual interventions such as congestion relief).
         base_expected = (base["p50"] + base["p90"]) / 2.0
-        cong_delta = base_expected * max(0.0, cong_mult - 1.0) * 0.6
-        conflict_delta = base_expected * max(0.0, conflict_mult - 1.0) * 0.4
+        cong_delta = base_expected * (cong_mult - 1.0) * 0.6
+        conflict_delta = base_expected * (conflict_mult - 1.0) * 0.4
         wx = base_expected * weather_shift * 0.3
         add = cong_delta + conflict_delta + wx
         nq = {k: max(0.0, v + add) for k, v in base.items()}

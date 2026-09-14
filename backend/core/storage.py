@@ -26,6 +26,18 @@ WAREHOUSE_SOURCES: Dict[str, tuple] = {
     "gold_node_observations": ("gold", "node_observations"),
     "raw_alerts": ("raw", "alerts.parquet"),
     "raw_conflict_events": ("raw", "conflict_events.parquet"),
+    "raw_weather": ("raw", "weather.parquet"),
+    "raw_weather_history": ("raw", "weather_history.parquet"),
+    "raw_congestion": ("raw", "congestion.parquet"),
+    "raw_customs": ("raw", "customs.parquet"),
+    "raw_cppi": ("raw", "cppi.parquet"),
+    "raw_cppi_history": ("raw", "cppi_history.parquet"),
+    "raw_ais_daily": ("raw", "ais_daily.parquet"),
+    "silver_ais_visits": ("silver", "ais_visits.parquet"),
+    "silver_checkpoint_outcomes": ("silver", "checkpoint_outcomes.parquet"),
+    "silver_checkpoints": ("silver", "checkpoints.parquet"),
+    "silver_route_edges": ("silver", "route_edges.parquet"),
+    "silver_holidays": ("silver", "holidays.parquet"),
 }
 
 

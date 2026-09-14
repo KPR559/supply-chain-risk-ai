@@ -11,20 +11,23 @@ from backend.core.routing.routes import (compare_routes, recommend_route, run_sc
 
 
 def test_topology_routes_are_well_formed():
+    assert len(topology.ROUTES) == 4
+    known = set(topology.node_index())
     for r in topology.ROUTES:
-        assert r.node_ids[0] == "frankfurt"
-        assert r.node_ids[-1] == "final_destination"
+        assert set(r.node_ids) <= known
         edges = topology.route_edges(r)
         assert len(edges) == len(r.node_ids) - 1
         assert topology.route_distance_km(r) > 0
         assert topology.route_baseline_days(r) > 0
 
 
-def test_topology_has_three_routes_with_distinct_profiles():
+def test_topology_routes_have_distinct_profiles():
     ids = [r.route_id for r in topology.ROUTES]
-    assert ids == ["suez", "cape", "dubai"]
-    d = {r.route_id: topology.route_distance_km(r) for r in topology.ROUTES}
-    assert d["cape"] > d["suez"] > d["dubai"]
+    assert ids == ["asia_europe_suez", "asia_europe_cape", "trans_pacific",
+                   "asia_us_east_panama"]
+    d = {r.route_id: topology.route_baseline_days(r) for r in topology.ROUTES}
+    assert d["asia_europe_cape"] > d["asia_europe_suez"]  # bypass is longer
+    assert d["trans_pacific"] == min(d.values())  # direct crossing is shortest
 
 
 def test_settings_loads_env_and_defaults():
@@ -65,13 +68,13 @@ def test_compare_routes_uses_every_route_and_keeps_ordering():
         assert o.p90_days > o.expected_days > 0
         assert o.uncertainty > 0
     by_id = {o.route.route_id: o for o in opts}
-    # dubai is the shortest route so must have the lowest expected days
-    assert by_id["dubai"].expected_days < by_id["cape"].expected_days
+    # trans_pacific is the shortest route so must have the lowest expected days
+    assert by_id["trans_pacific"].expected_days < by_id["asia_europe_cape"].expected_days
 
 
 def test_run_scenario_returns_full_payload():
     base = {n: {"p50": 6.0, "p80": 9.0, "p90": 12.0} for n in topology.node_index()}
-    sc = Scenario(name="test", route_id="suez")
+    sc = Scenario(name="test", route_id="asia_europe_suez")
     res = run_scenario(base, {}, sc, n_sim=500, seed=2)
     assert res["scenario"] == "test"
     assert res["monte_carlo"]["expected_days"] > 0
