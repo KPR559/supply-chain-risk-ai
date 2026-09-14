@@ -8,10 +8,22 @@ Outputs:
   data/features/regimes.parquet  — Section 22
 
 Schema: location_id, checkpoint_id, timestamp, regime_state, change_point_flag,
-  change_point_score, regime_duration_days, activity_anomaly, delay_anomaly,
-  congestion_anomaly, weather_anomaly, regime_confidence
+  change_point_source, change_point_score, regime_duration_days, activity_anomaly,
+  delay_anomaly, congestion_anomaly, weather_anomaly, regime_confidence,
+  event_category
 
 States: NORMAL, DETERIORATING, DISRUPTION, SEVERE_DISRUPTION, RECOVERY
+
+Change points combine two detectors (previously only state transitions):
+  * state transitions between regime_state values
+  * binary-segmentation change points on the delay series
+    (backend.core.data.anomalies.binary_segmentation_changepoints)
+`change_point_source` records which detector(s) fired:
+  none / transition / binseg / both.
+
+`event_category` labels each disrupted row via
+backend.core.data.anomalies.event_classify:
+  normal / disruption / congestion / weather / geopolitical / major_disruption.
 
 Usage:
   python -m backend.core.data.build_regimes
@@ -20,21 +32,37 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from backend.core import storage
 from backend.core.config import get_settings
-from backend.core.data.anomalies import detect_regime
+from backend.core.data.anomalies import (
+    binary_segmentation_changepoints,
+    detect_regime,
+    event_classify,
+)
 from backend.core.logging_util import get_logger
 
 log = get_logger(__name__)
 
 
-def build() -> pd.DataFrame:
-    con = storage.connect()
-    try:
-        gold = pd.read_sql('SELECT * FROM "gold_node_observations"', con)
-    finally:
-        con.close()
+def build(gold: pd.DataFrame | None = None,
+          out_path=None) -> pd.DataFrame:
+    """Build the regimes table.
+
+    `gold` is injectable for testing/rebuilding: when None (default) it is
+    read from the warehouse table ``gold_node_observations``. A dataframe with
+    columns node_id, timestamp, delay_hours, congestion_index, weather_severity,
+    conflict_risk_score reproduces the committed regimes.parquet.
+    `out_path` overrides the output location (tests must pass a tmp path so
+    the committed file is never clobbered).
+    """
+    if gold is None:
+        con = storage.connect()
+        try:
+            gold = pd.read_sql('SELECT * FROM "gold_node_observations"', con)
+        finally:
+            con.close()
 
     gold["timestamp"] = pd.to_datetime(gold["timestamp"])
     gold = gold.sort_values(["node_id", "timestamp"]).reset_index(drop=True)
@@ -60,11 +88,31 @@ def build() -> pd.DataFrame:
             elif i > 0 and g.loc[i - 1, "regime_state"] in ("SEVERE_DISRUPTION", "DISRUPTION", "DETERIORATING"):
                 g.loc[i, "regime_state"] = "RECOVERY"
 
-        # Change-point flags: transition between states
+        # Change-point flags: state transitions UNION binary-segmentation
+        # change points on the delay series.
         states = g["regime_state"].tolist()
-        cp_flags = [False] + [states[i] != states[i - 1] for i in range(1, len(states))]
-        g["change_point_flag"] = cp_flags
+        trans_flags = np.array(
+            [False] + [states[i] != states[i - 1] for i in range(1, len(states))],
+            dtype=bool,
+        )
+        delay_series = g["delay_hours"].astype(float)
+        cps = binary_segmentation_changepoints(
+            delay_series.fillna(delay_series.median())
+        )
+        binseg_flags = np.zeros(len(g), dtype=bool)
+        for pos in cps:
+            if 0 <= pos < len(g):
+                binseg_flags[pos] = True
+        g["change_point_flag"] = trans_flags | binseg_flags
+        src = np.full(len(g), "none", dtype=object)
+        src[trans_flags & ~binseg_flags] = "transition"
+        src[~trans_flags & binseg_flags] = "binseg"
+        src[trans_flags & binseg_flags] = "both"
+        g["change_point_source"] = src
         g["change_point_score"] = g["regime_roll_z"].abs().round(3)
+
+        # Event-category labels for disrupted rows.
+        g["event_category"] = event_classify(g).astype(str).tolist()
 
         # Regime duration (days in current state)
         durations = []
@@ -97,7 +145,9 @@ def build() -> pd.DataFrame:
                 "location_id": nid, "checkpoint_id": nid, "node_id": nid,
                 "timestamp": r["timestamp"], "regime_state": r["regime_state"],
                 "change_point_flag": bool(r["change_point_flag"]),
+                "change_point_source": str(r["change_point_source"]),
                 "change_point_score": float(r["change_point_score"]),
+                "event_category": str(r["event_category"]),
                 "regime_duration_days": int(r["regime_duration_days"]),
                 "regime_duration_hours": float(r["regime_duration_hours"]),
                 "activity_anomaly": float(r.get("activity_anomaly", 0)),
@@ -116,7 +166,7 @@ def build() -> pd.DataFrame:
 
     s = get_settings()
     storage.ensure_storage_dirs()
-    out = s.abs_data_dir / "features" / "regimes.parquet"
+    out = Path(out_path) if out_path is not None else s.abs_data_dir / "features" / "regimes.parquet"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
     log.info(f"Wrote {len(df)} rows -> {out}")
