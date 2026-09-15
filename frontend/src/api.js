@@ -62,6 +62,16 @@ async function post(path, body, { token = null } = {}) {
   return res.json();
 }
 
+const ROUTE_ENDPOINTS = {
+  asia_europe_suez: ["shanghai", "rotterdam"],
+  asia_europe_cape: ["shanghai", "rotterdam"],
+  trans_pacific: ["shanghai", "los_angeles"],
+  asia_us_east_panama: ["shanghai", "new_york"],
+  suez: ["shanghai", "rotterdam"],
+  cape: ["shanghai", "rotterdam"],
+  dubai: ["shanghai", "rotterdam"],
+};
+
 export const api = {
   health: () => get("/health"),
   login: (username, password) => post("/login", { username, password }),
@@ -74,14 +84,16 @@ export const api = {
   logout: (token) => post("/logout", {}, { token }),
   deleteAccount: (token) => del("/account", { token }),
   demo: () => get("/demo"),
-  predict: (route, { nSim = null, deadlineDate = null } = {}) =>
-    post("/predict", {
-      origin: "frankfurt",
-      destination: "final_destination",
+  predict: (route, { nSim = null, deadlineDate = null } = {}) => {
+    const [origin, destination] = ROUTE_ENDPOINTS[route] || ["shanghai", "rotterdam"];
+    return post("/predict", {
+      origin,
+      destination,
       route_id: route,
       ...(nSim ? { n_sim: nSim } : {}),
       ...(deadlineDate ? { deadline_date: deadlineDate } : {}),
-    }),
+    });
+  },
   whatif: (shipmentId, name, nodeId, adjustments) =>
     post("/what-if", { shipment_id: shipmentId, name, node_id: nodeId, adjustments }),
   compare: (shipmentId, objectives) =>

@@ -81,6 +81,10 @@ class SimulationResult:
     deadline_days: Optional[float]
     critical_nodes: Dict[str, float]  # share of expected delay by node
     per_node_expected_delay: Dict[str, float] = field(default_factory=dict)
+    # Per-simulation detail (populated by run_monte_carlo; cheap to keep).
+    total_delay_hours: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    total_transit_hours: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    node_samples: Dict[str, np.ndarray] = field(default_factory=dict)
 
     def to_dict(self, origin_date: str = None, deadline_date: str = None) -> Dict:
         d = {
@@ -117,12 +121,15 @@ def run_monte_carlo(
     Parameters
     ----------
     node_delay_quantiles : per-node {p50, p80, p90} delay-hour predictions.
+        An optional ``p95`` entry per node is honoured when present
+        (older callers passing only p50/p80/p90 are unaffected).
     edge_transit_days : optional per-edge baseline transit days (src->dst key);
         defaults to topology baselines.
     """
     n_sim = n_sim or get_settings().mc_simulations
     seed = seed if seed is not None else get_settings().mc_seed
     rng = np.random.default_rng(seed)
+    route_id = topology.resolve_route_id(route_id)
 
     if edge_transit_days is None:
         edge_transit_days = {f"{e.src}->{e.dst}": e.baseline_days
@@ -131,17 +138,23 @@ def run_monte_carlo(
     route = topology.route_by_id(route_id)
     node_ids = route.node_ids
 
-    # Pre-build per-node samplers.
+    # Pre-build per-node samplers (p95-aware, backward compatible).
     samplers = {}
     for nid in node_ids:
         q = node_delay_quantiles.get(nid, {})
         p50 = q.get("p50", 0.0)
         p80 = q.get("p80", p50)
         p90 = q.get("p90", p80)
-        samplers[nid] = QuantileSampler(
-            np.array([0.0, 0.50, 0.80, 0.90]),
-            np.array([0.0, p50, p80, p90]),
-        )
+        if "p95" in q:
+            samplers[nid] = QuantileSampler(
+                np.array([0.0, 0.50, 0.80, 0.90, 0.95]),
+                np.array([0.0, p50, p80, p90, q.get("p95", p90)]),
+            )
+        else:
+            samplers[nid] = QuantileSampler(
+                np.array([0.0, 0.50, 0.80, 0.90]),
+                np.array([0.0, p50, p80, p90]),
+            )
 
     # Sample per-node delays (shape n_sim per node for route-ordered nodes)
     node_samples = {}
@@ -203,6 +216,9 @@ def run_monte_carlo(
         deadline_days=deadline_days,
         critical_nodes=critical_nodes,
         per_node_expected_delay=per_node_expected,
+        total_delay_hours=total_delay,
+        total_transit_hours=total_transit,
+        node_samples=node_samples,
     )
     log.info(f"MC sim route={route_id} n={n_sim} expected_days={expected_days:.2f} "
              f"P90={percentiles['p90']:.2f} miss={p_miss:.3f}")

@@ -35,7 +35,7 @@ export const FALLBACK_DRIVER_TRENDS = [
 
 export const FALLBACK_EXPLANATION = {
   node_label: "Suez Canal",
-  node_id: "suez_canal",
+  node_id: "suez",
   delay_probability: 0.99,
   top_factors: [
     { name: "base", contribution: 17.46 },

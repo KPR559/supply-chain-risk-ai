@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { api } from "../api.js";
+<<<<<<< HEAD
 import { SCENARIO_PRESETS, getPresetById } from "../data/whatIfPresets.js";
 import { getCheckpointImpacts, formatHistoryEntry } from "../utils/whatIfUtils.js";
 import ScenarioInputPanel from "./what-if/ScenarioInputPanel.jsx";
@@ -10,6 +11,15 @@ import CheckpointImpactTable from "./what-if/CheckpointImpactTable.jsx";
 import ScenarioImpactExplanation from "./what-if/ScenarioImpactExplanation.jsx";
 import RecommendedActions from "./what-if/RecommendedActions.jsx";
 import ScenarioHistory from "./what-if/ScenarioHistory.jsx";
+=======
+
+const PRESETS = [
+  { name: "Suez +30% congestion", node_id: "suez", adjustments: { congestion_mult: 1.3 } },
+  { name: "Suez closed", node_id: "suez", adjustments: { close: true } },
+  { name: "Malacca +50% congestion", node_id: "strait_of_malacca", adjustments: { congestion_mult: 1.5 } },
+  { name: "Heavy weather (Suez +12h)", node_id: "suez", adjustments: { weather_shift: 12 } },
+];
+>>>>>>> 79d87700fa59a36f61cef2bbd0bcd4798c0c68aa
 
 export default function WhatIfPanel({ prediction }) {
   const [selectedPresetId, setSelectedPresetId] = useState("baseline");

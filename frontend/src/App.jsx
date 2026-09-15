@@ -21,11 +21,13 @@ import RiskDriversView from "./pages/RiskDriversView.jsx";
 import WhatIfView from "./pages/WhatIfView.jsx";
 import CompareRoutesView from "./pages/CompareRoutesView.jsx";
 import SettingsView from "./pages/SettingsView.jsx";
+import SystemSettingsView from "./pages/SystemSettingsView.jsx";
+import AccountSettingsView from "./pages/AccountSettingsView.jsx";
 import Toast from "./components/Toast.jsx";
 import { loadUiPrefs } from "./prefs.js";
 
 
-const DEFAULT_ROUTE = "suez";
+const DEFAULT_ROUTE = "asia_europe_suez";
 const DEFAULT_NSIM = 10000;
 
 const VIEWS = {
@@ -38,6 +40,8 @@ const VIEWS = {
   simulator: WhatIfView,
   compare: CompareRoutesView,
   settings: SettingsView,
+  "settings-system": SystemSettingsView,
+  "settings-account": AccountSettingsView,
 };
 
 export default function App() {
@@ -319,6 +323,15 @@ export default function App() {
     }
   }, []);
 
+  const isSettingsSubView = view === "settings-system" || view === "settings-account";
+  const sidebarActive = isSettingsSubView ? "settings" : view;
+
+  const handleNavigateSettings = (sub) => {
+    if (sub === "system") setView("settings-system");
+    else if (sub === "account") setView("settings-account");
+    else setView("settings");
+  };
+
   const ViewComponent = VIEWS[view] || PredictionResultsView;
   const data = {
     prediction,
@@ -340,6 +353,8 @@ export default function App() {
     onLogout: handleLogout,
     onDeleteAccount: handleDeleteAccount,
     onNavigate: setView,
+    onNavigateSettings: handleNavigateSettings,
+    onBackToSettings: () => setView("settings"),
     notify,
     alertsOpen,
     setAlertsOpen,
@@ -357,7 +372,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar
-        active={view}
+        active={sidebarActive}
         onSelect={setView}
         user={user}
         onLogout={handleLogout}
@@ -367,7 +382,7 @@ export default function App() {
         }}
       />
       <div className="main-area">
-        <MobileNav active={view} onSelect={setView} onLogout={handleLogout} />
+        <MobileNav active={sidebarActive} onSelect={setView} onLogout={handleLogout} />
         <Header
           shipments={shipments}
           selectedId={selectedShipment?.id}

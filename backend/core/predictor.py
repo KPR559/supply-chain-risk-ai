@@ -54,8 +54,17 @@ class PredictionEngine:
             s = get_settings()
             if not registry.has_model("classifier") or not registry.has_model("delay_model"):
                 raise RuntimeError(
-                    "Trained models not found. Run: python -m backend.core.train")
-            self.classifier = registry.load_model("classifier")
+                    "Trained models not found. Run: python -m backend.core.train_ml_part --version 1.1.0  (or: python -m backend.core.train)")
+            raw_clf = registry.load_model("classifier")
+            # XGBoost 1.7 pickle contains `use_label_encoder` removed in 2.x;
+            # patch so get_params() doesn't raise AttributeError at predict.
+            try:
+                base = raw_clf.get("base") if isinstance(raw_clf, dict) else raw_clf
+                if base is not None and base.__class__.__name__ == "XGBClassifier" and not hasattr(base, "use_label_encoder"):
+                    base.__dict__["use_label_encoder"] = False  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            self.classifier = raw_clf
             self.delay_models = registry.load_model("delay_model")
 
             # Feature metadata
@@ -66,10 +75,53 @@ class PredictionEngine:
             if not self.feature_groups:
                 self.feature_groups = _default_groups(self.feature_names)
 
-            # Full feature matrix for all nodes (cached)
-            from backend.core.pipeline import prepare_ml_dataset
-            self.ml = prepare_ml_dataset()
-            self.ml = self.ml.dropna(subset=self.feature_names).reset_index(drop=True)
+            # Detect new data/ml pipeline: feature_pipeline.joblib means 84-feature
+            # regime_state/season OHE flow that needs preprocessing at inference.
+            self._feature_pipeline = None
+            self._ml_feature_names: List[str] = list(self.feature_names)
+            try:
+                import joblib
+                fp = s.abs_artifact_dir / "feature_pipeline.joblib"
+                if fp.exists():
+                    self._feature_pipeline = joblib.load(str(fp))
+                    # Keep the post-preprocessing names from the new training run
+                    self._ml_feature_names = list(
+                        self._feature_pipeline.get("feature_names", self.feature_names))
+            except Exception:
+                pass
+
+            # Full feature matrix for all nodes (cached) — source must match
+            # the pipeline that produced the artifacts, otherwise feature_names
+            # won't align with the data.
+            if self._feature_pipeline is not None:
+                # New path: data/ml/ml_training_data.parquet already has 84-col
+                # past-only features (built by build_features.py). Reuse it so
+                # feature_names align exactly; no second feature build.
+                try:
+                    ml_path = s.abs_data_dir / "ml" / "ml_training_data.parquet"
+                    if ml_path.exists():
+                        raw = pd.read_parquet(ml_path)
+                        self.ml = raw.copy()
+                        if "delay_flag" in raw.columns and "is_delayed" not in self.ml.columns:
+                            self.ml["is_delayed"] = raw["delay_flag"]
+                        # Apply stored preprocessing once so self.ml already holds
+                        # the transformed matrix the classifier expects.
+                        self.ml = self._apply_feature_pipeline(self.ml)
+                        # Drop rows where any of the post-transform features is NaN
+                        self.ml = self.ml.dropna(subset=[
+                            c for c in self._ml_feature_names if c in self.ml.columns
+                        ]).reset_index(drop=True)
+                    else:
+                        raise FileNotFoundError(str(ml_path))
+                except Exception as e:
+                    log.warning(f"data/ml fallback to pipeline: {e}")
+                    from backend.core.pipeline import prepare_ml_dataset
+                    self.ml = prepare_ml_dataset()
+                    self.ml = self.ml.dropna(subset=self.feature_names).reset_index(drop=True)
+            else:
+                from backend.core.pipeline import prepare_ml_dataset
+                self.ml = prepare_ml_dataset()
+                self.ml = self.ml.dropna(subset=self.feature_names).reset_index(drop=True)
             if self.ml.empty:
                 raise RuntimeError("No usable feature rows to predict on")
 
@@ -81,8 +133,12 @@ class PredictionEngine:
             try:
                 from backend.core.graph.gat import train_gat_for_route
                 if get_settings().graph_backend != "none":
-                    g = train_gat_for_route(self.ml, self.feature_names,
-                                            route_id="suez", epochs=getattr(s, "gat_epochs", 40))
+                    gat_feats = self._ml_feature_names if self._feature_pipeline is not None and self._ml_feature_names else self.feature_names
+                    gat_route = "asia_europe_suez" if topology.route_by_id("asia_europe_suez") else "suez"
+                    if not topology.route_by_id(gat_route):
+                        gat_route = topology.all_route_ids()[0] if topology.all_route_ids() else gat_route
+                    g = train_gat_for_route(self.ml, gat_feats,
+                                            route_id=gat_route, epochs=getattr(s, "gat_epochs", 40))
                     self.gat = g
                     if g is not None:
                         log.info(f"GAT ready (route={g.route_id}) residual applied")
@@ -94,6 +150,36 @@ class PredictionEngine:
             log.info("PredictionEngine ready")
 
     # ------------------------------------------------------------------
+    def _apply_feature_pipeline(self, df: pd.DataFrame) -> pd.DataFrame:
+        """When the new data/ml training ran, apply its stored imputer+OHE."""
+        if self._feature_pipeline is None:
+            return df
+        import pandas as pd
+        plan = self._feature_pipeline.get("plan", {})
+        imputer = self._feature_pipeline.get("imputer")
+        encoder = self._feature_pipeline.get("encoder")
+        ohe_names: List[str] = list(self._feature_pipeline.get("ohe_names", []))
+        numeric: List[str] = list(plan.get("numeric", []))
+        categorical: List[str] = list(plan.get("categorical", []))
+        out = df.copy()
+        if numeric and imputer is not None:
+            avail = [c for c in numeric if c in out.columns]
+            if avail:
+                imp = pd.DataFrame(
+                    imputer.transform(out[avail].astype(float)),
+                    columns=avail, index=out.index)
+                for c in avail:
+                    out[c] = imp[c]
+        if categorical and encoder is not None and ohe_names:
+            avail_cat = [c for c in categorical if c in out.columns]
+            if avail_cat:
+                filled = out[avail_cat].fillna("missing").astype(str)
+                ohe = pd.DataFrame(
+                    encoder.transform(filled), columns=ohe_names, index=out.index)
+                for c in ohe_names:
+                    out[c] = ohe[c].to_numpy()
+        return out
+
     def _load_feature_groups(self) -> Dict[str, List[str]]:
         s = get_settings()
         p = s.abs_artifact_dir / "feature_meta" / "groups.json"
@@ -115,10 +201,42 @@ class PredictionEngine:
         return latest
 
     def _predict_node(self, row: pd.Series, gat_residual: float = 0.0) -> Dict:
-        feat = row[self.feature_names].to_frame().T
-        p_delay = float(classification.predict_proba(self.classifier, feat)[0])
+        # Build feature frame through the pipeline that was active at training.
+        if self._feature_pipeline is not None:
+            raw_cols: List[str] = list(self._feature_pipeline.get("plan", {}).get("numeric", [])) \
+                + list(self._feature_pipeline.get("plan", {}).get("categorical", []))
+            raw = row[raw_cols].to_frame().T if raw_cols else row[self.feature_names].to_frame().T
+            # Apply stored imputer + OHE so classifier sees 84 cols
+            tmp = raw.copy()
+            tmp = self._apply_feature_pipeline(tmp)
+            feat = tmp[self._ml_feature_names] if self._ml_feature_names else tmp[self.feature_names]
+        else:
+            feat = row[self.feature_names].to_frame().T
+        # XGBoost 1.7 pickles break on 2.x get_params — try wrapper then booster fallback
+        try:
+            p_delay = float(classification.predict_proba(self.classifier, feat)[0])
+        except AttributeError:
+            try:
+                import xgboost as xgb
+                base = self.classifier.get("base") if isinstance(self.classifier, dict) else self.classifier
+                booster = base.get_booster() if hasattr(base, "get_booster") else None
+                if booster is not None:
+                    dm = xgb.DMatrix(feat.to_numpy(dtype=np.float32))
+                    raw = booster.predict(dm)
+                    # binary:logistic already gives proba; else clip
+                    p = float(raw[0]) if raw.ndim == 1 else float(raw[0, 1] if raw.shape[1] > 1 else raw[0])
+                    iso = self.classifier.get("isotonic") if isinstance(self.classifier, dict) else None
+                    p_delay = float(iso.predict([p])[0]) if iso is not None else float(p)
+                else:
+                    raise
+            except Exception:
+                # last resort: neutral probability
+                p_delay = 0.5
         q = delay.predict_quantiles(self.delay_models, feat)
-        p50 = float(q["p50"][0]); p80 = float(q["p80"][0]); p90 = float(q["p90"][0])
+        # New models ship p95; old have only p50/p80/p90 — handle both
+        p50 = float(q.get("p50", q.get("p50", [0.0]))[0] if "p50" in q else 0.0)
+        p80 = float(q.get("p80", [p50])[0]); p90 = float(q.get("p90", [p80])[0])
+        p95 = float(q.get("p95", [p90])[0]) if "p95" in q else None
         # NLP alert bump: if recent alerts exist for this node, scale quantiles
         nid = row["node_id"]
         if self.alert_agg is not None and len(self.alert_agg):
@@ -127,6 +245,8 @@ class PredictionEngine:
                 alert_risk = float(a.iloc[0]["alert_risk_score"])
                 bump = 1.0 + 0.4 * alert_risk
                 p50 *= bump; p80 *= bump; p90 *= bump
+                if p95 is not None:
+                    p95 *= bump
                 p_delay = min(0.99, p_delay + 0.05 * alert_risk)
         # GAT residual adjustment
         if gat_residual:
@@ -134,12 +254,20 @@ class PredictionEngine:
             p50 = max(0.0, p50 + gat_residual * residual_scale)
             p80 = max(p50, p80 + gat_residual * residual_scale)
             p90 = max(p80, p90 + gat_residual * residual_scale)
-        # enforce monotone quantiles (p50 <= p80 <= p90)
-        p50 = max(0.0, min(p50, p80, p90))
-        p80 = max(p50, round(min(max(p80, p50), max(p50, p90)), 3))
-        p90 = max(p80, p90)
-        exp = (p50 + p90) / 2.0
-        return {
+            if p95 is not None:
+                p95 = max(p90, p95 + gat_residual * residual_scale)
+        # enforce monotone quantiles (p50 <= p80 <= p90 <= p95)
+        if p95 is not None:
+            p50 = max(0.0, min(p50, p80, p90, p95))
+            p80 = max(p50, round(min(max(p80, p50), max(p50, p90, p95)), 3))
+            p90 = max(p80, round(min(max(p90, p80), p95), 3))
+            p95 = max(p90, p95)
+        else:
+            p50 = max(0.0, min(p50, p80, p90))
+            p80 = max(p50, round(min(max(p80, p50), max(p50, p90)), 3))
+            p90 = max(p80, p90)
+        exp = (p50 + (p95 if p95 is not None else p90)) / 2.0
+        out: Dict = {
             "node_id": nid,
             "label": topology.node_label(nid),
             "timestamp": str(row["timestamp"]),
@@ -153,6 +281,9 @@ class PredictionEngine:
             "conflict": round(float(row["conflict_risk_score"]), 3),
             "regime": int(row.get("regime_disrupted", 0)),
         }
+        if p95 is not None:
+            out["p95"] = round(float(p95), 1)
+        return out
 
     # ------------------------------------------------------------------
     def predict_shipment(self, origin: str, destination: str,
@@ -165,9 +296,17 @@ class PredictionEngine:
                          seed: Optional[int] = None) -> Dict:
         """End-to-end prediction for a shipment on a route."""
         self.ensure_ready()
+        route_id = topology.resolve_route_id(route_id)
         route = topology.route_by_id(route_id)
         if route is None:
             raise ValueError(f"Unknown route {route_id}")
+        # Resolve endpoints: fall back to the route's real origin/destination
+        # when the caller only labels the corridor (e.g. old frankfurt aliases).
+        idx = topology.node_index()
+        if origin not in idx and route.node_ids:
+            origin = route.node_ids[0]
+        if destination not in idx and route.node_ids:
+            destination = route.node_ids[-1]
         if origin_date:
             base = pd.Timestamp(origin_date)
         else:
@@ -187,8 +326,12 @@ class PredictionEngine:
             if preds.get(nid) is None:
                 preds[nid] = self._default_node(nid, base)
 
-        delay_quantiles = {nid: {"p50": p["p50"], "p80": p["p80"], "p90": p["p90"]}
-                           for nid, p in preds.items()}
+        delay_quantiles = {}
+        for nid, p in preds.items():
+            q = {"p50": p["p50"], "p80": p["p80"], "p90": p["p90"]}
+            if "p95" in p:
+                q["p95"] = p["p95"]
+            delay_quantiles[nid] = q
         delay_probs = {nid: p["delay_probability"] for nid, p in preds.items()}
 
         deadline_days = None
@@ -236,13 +379,18 @@ class PredictionEngine:
         node_order = getattr(self.gat, "node_order", None)
         if node_order is None:
             return {}
-        mat = np.zeros((1, len(node_order), len(self.feature_names)), dtype=np.float32)
+        feat = self._ml_feature_names if self._feature_pipeline is not None and self._ml_feature_names else self.feature_names
+        # Apply pipeline transform if needed for GAT input
+        rows_df = node_rows.copy()
+        if self._feature_pipeline is not None:
+            rows_df = self._apply_feature_pipeline(rows_df)
+        mat = np.zeros((1, len(node_order), len(feat)), dtype=np.float32)
         missing = set(node_order)
-        for _, r in node_rows.iterrows():
+        for _, r in rows_df.iterrows():
             nid = r["node_id"]
             if nid in node_order:
                 j = node_order.index(nid)
-                for k, c in enumerate(self.feature_names):
+                for k, c in enumerate(feat):
                     v = r.get(c, np.nan)
                     mat[0, j, k] = 0.0 if pd.isna(v) else float(v)
                 missing.discard(nid)
@@ -271,9 +419,18 @@ class PredictionEngine:
         row = features[features["node_id"] == riskiest]
         if row.empty:
             return {"node_id": riskiest, "error": "no features"}
-        bg = self.ml.sample(min(400, len(self.ml)), random_state=0)[self.feature_names]
-        expl = local_explanation(self.classifier, bg, row[self.feature_names],
-                                 self.feature_names, self.feature_groups, top_k=top_k)
+        expl_feats = self._ml_feature_names if self._feature_pipeline is not None and self._ml_feature_names else self.feature_names
+        # Apply pipeline transform for the new 84-feature models
+        if self._feature_pipeline is not None:
+            bg_raw = self.ml.sample(min(400, len(self.ml)), random_state=0)
+            bg = self._apply_feature_pipeline(bg_raw)[expl_feats]
+            row_feat = self._apply_feature_pipeline(row)[expl_feats]
+        else:
+            bg = self.ml.sample(min(400, len(self.ml)), random_state=0)[self.feature_names]
+            row_feat = row[self.feature_names]
+            expl_feats = self.feature_names
+        expl = local_explanation(self.classifier, bg, row_feat,
+                                 expl_feats, self.feature_groups, top_k=top_k)
         expl["node_id"] = riskiest
         expl["node_label"] = topology.node_label(riskiest)
         expl["delay_probability"] = max(n["delay_probability"] for n in nodes)

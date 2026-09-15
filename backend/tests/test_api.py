@@ -27,17 +27,19 @@ def test_routes_listing_shape():
     assert r.status_code == 200
     routes = r.json()["routes"]
     ids = {x["route_id"] for x in routes}
-    assert {"suez", "cape", "dubai"} <= ids
+    assert {"asia_europe_suez", "asia_europe_cape", "trans_pacific",
+            "asia_us_east_panama"} <= ids
     for x in routes:
         assert x["baseline_days"] > 0
-        assert len(x["nodes"]) >= 6
+        assert x["distance_km"] > 0
+        assert len(x["nodes"]) >= 2
 
 
 def test_route_detail():
-    r = client.get("/api/v1/routes/cape")
+    r = client.get("/api/v1/routes/asia_europe_cape")
     assert r.status_code == 200
     body = r.json()
-    assert body["route_id"] == "cape"
+    assert body["route_id"] == "asia_europe_cape"
     assert len(body["nodes"]) == len(body["edges"]) + 1
     assert body["distance_km"] > body["baseline_days"]
 
@@ -47,10 +49,10 @@ def test_route_404():
 
 
 def test_simulate_endpoint_shape():
-    r = client.post("/api/v1/simulate", json={"route_id": "suez", "n_sim": 200})
+    r = client.post("/api/v1/simulate", json={"route_id": "asia_europe_suez", "n_sim": 200})
     assert r.status_code == 200
     mc = r.json()
-    assert mc["route_id"] == "suez"
+    assert mc["route_id"] == "asia_europe_suez"
     assert mc["n_simulations"] == 200
     assert mc["expected_days"] > 0
     assert mc["percentiles"]["p90"] >= mc["percentiles"]["p50"]

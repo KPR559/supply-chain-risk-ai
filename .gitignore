@@ -6,7 +6,6 @@ __pycache__/
 venv/
 env/
 
-
 # Node
 node_modules/
 dist/
@@ -31,3 +30,5 @@ _*.pid
 .DS_Store
 
 .vercel
+
+.env
