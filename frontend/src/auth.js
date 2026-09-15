@@ -4,11 +4,6 @@
 // opaque session token — never any password. A stored session is valid only
 // if it carries a token (old client-side sessions are ignored).
 
-export const DEFAULT_CREDENTIALS = {
-  username: "admin",
-  password: "admin123",
-};
-
 const SESSION_KEY = "scm.auth.v1";
 
 function storeOf(name) {
@@ -87,6 +82,26 @@ export function updateSessionTokens(token, refreshToken) {
     at: new Date().toISOString(),
   });
   // preserve original storage choice
+  const inLocal = readStore(storeOf("localStorage"));
+  if (inLocal && inLocal.username === existing.username) {
+    writeStore(storeOf("localStorage"), payload);
+  } else {
+    writeStore(storeOf("sessionStorage"), payload);
+  }
+}
+
+export function updateSessionUser(username, token, refreshToken) {
+  // After an account rename the backend issues a fresh token pair; fold the
+  // new username + tokens into whichever store the session currently lives in.
+  const existing = getSession();
+  if (!existing) return;
+  const payload = JSON.stringify({
+    ...existing,
+    username,
+    token,
+    refresh_token: refreshToken,
+    at: new Date().toISOString(),
+  });
   const inLocal = readStore(storeOf("localStorage"));
   if (inLocal && inLocal.username === existing.username) {
     writeStore(storeOf("localStorage"), payload);

@@ -4,17 +4,11 @@ import { formatDelayRisk, formatEta, formatResilience } from "../../utils/format
 
 export default function RecommendationPanel({ recommendation, isFallback }) {
   if (!recommendation?.route) {
-    return (
-      <div className="recommendation-panel fallback">
-        <Star className="rec-icon" size={18} aria-hidden="true" />
-        <div className="rec-content">
-          <strong>Recommendation:</strong> Unable to determine a recommended route with available data.
-        </div>
-      </div>
-    );
+    return null;
   }
 
-  const { route, text } = recommendation;
+  const { route, reasons } = recommendation;
+  const displayReasons = reasons || route.reasons || [];
   const metrics = [
     route.delayRisk != null && `Delay risk: ${formatDelayRisk(route.delayRisk)}`,
     route.p50Eta != null && `P50 ETA: ${formatEta(route.p50Eta)}`,
@@ -29,7 +23,13 @@ export default function RecommendationPanel({ recommendation, isFallback }) {
           <strong>Recommendation:</strong>
           <span className="rec-route-name">{route.scenario}</span>
         </div>
-        <p className="rec-text">{text}</p>
+        {displayReasons.length > 0 ? (
+          <ul className="rec-reasons">
+            {displayReasons.map((r, i) => <li key={i}>{r}</li>)}
+          </ul>
+        ) : (
+          <p className="rec-text">This route offers the best balance of risk and transit time for this corridor.</p>
+        )}
         {metrics.length > 0 && (
           <div className="rec-metrics">
             {metrics.map((m, i) => (

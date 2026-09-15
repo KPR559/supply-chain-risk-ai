@@ -25,7 +25,7 @@ export default function RouteMapView({ data }) {
 
       {prediction && (
         <section className="panel">
-          <RouteMap activeRouteId={route} nodes={prediction?.node_predictions} />
+          <RouteMap key={route} activeRouteId={route} nodes={prediction?.node_predictions} />
         </section>
       )}
     </div>

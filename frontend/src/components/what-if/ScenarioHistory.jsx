@@ -1,74 +1,46 @@
 import React, { useState, useEffect } from "react";
-import { formatEta, formatPercent } from "../../utils/whatIfUtils.js";
-import { ArrowLeft, Trash2, Clock } from "lucide-react";
+import { formatEta, formatPercent, formatResilience } from "../../utils/whatIfUtils.js";
+import { ArrowRight, Trash2, Clock } from "lucide-react";
 
-const STORAGE_KEY = "logix.whatif.history.v1";
-const MAX_HISTORY = 5;
+export default function ScenarioHistory({ history, onRerun }) {
+  const [items, setItems] = useState(history || []);
 
-export default function ScenarioHistory({ onRerun }) {
-  const [history, setHistory] = useState([]);
-
-  // Load history from localStorage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setHistory(parsed.slice(0, MAX_HISTORY));
-      }
-    } catch (e) {
-      console.warn("Failed to load what-if history:", e);
-    }
-  }, []);
+    setItems(history || []);
+  }, [history]);
 
   const saveHistory = (newHistory) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
+      localStorage.setItem("logix.whatif.history.v2", JSON.stringify(newHistory));
     } catch (e) {
       console.warn("Failed to save what-if history:", e);
     }
   };
 
-  const addToHistory = (entry) => {
-    setHistory((prev) => {
-      const updated = [entry, ...prev.filter((e) => e.id !== entry.id)].slice(0, MAX_HISTORY);
-      saveHistory(updated);
-      return updated;
-    });
-  };
-
   const removeFromHistory = (id) => {
-    setHistory((prev) => {
-      const updated = prev.filter((e) => e.id !== id);
-      saveHistory(updated);
-      return updated;
-    });
+    const updated = items.filter((e) => e.id !== id);
+    setItems(updated);
+    saveHistory(updated);
   };
 
   const clearHistory = () => {
-    setHistory([]);
+    setItems([]);
     saveHistory([]);
   };
 
-  if (history.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <section className="panel what-if-history">
       <div className="panel-head">
         <h2>Recent Scenarios</h2>
-        {history.length > 0 && (
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={clearHistory}
-            title="Clear all scenario history"
-          >
-            <Trash2 size={13} aria-hidden="true" /> Clear
-          </button>
-        )}
+        <button className="btn btn-ghost btn-sm" onClick={clearHistory} title="Clear scenario history">
+          <Trash2 size={13} aria-hidden="true" /> Clear
+        </button>
       </div>
 
       <div className="history-list">
-        {history.map((entry) => (
+        {items.map((entry) => (
           <div key={entry.id} className="history-item">
             <div className="history-main">
               <div className="history-name">
@@ -81,12 +53,22 @@ export default function ScenarioHistory({ onRerun }) {
                   {entry.time}
                 </span>
                 <span className="history-p90">
-                  <span className="label">P90:</span>
-                  <span className="value mono">{formatEta(entry.p90Eta)}</span>
+                  <span className="label">Expected:</span>
+                  <span className="value mono">{formatEta(entry.expectedDays)}</span>
                 </span>
+                {entry.deltaDays != null && (
+                  <span className={`history-delta ${getDeltaClass(entry.deltaDays)}`}>
+                    <span className="label">Δ:</span>
+                    <span className="value">{(entry.deltaDays > 0 ? "+" : "")}{entry.deltaDays.toFixed(1)}d</span>
+                  </span>
+                )}
                 <span className="history-risk">
                   <span className="label">Risk:</span>
                   <span className="value">{formatPercent(entry.delayRisk)}</span>
+                </span>
+                <span className="history-resilience">
+                  <span className="label">Resilience:</span>
+                  <span className="value">{entry.resilience != null ? formatResilience(entry.resilience) : "—"}</span>
                 </span>
               </div>
             </div>
@@ -96,7 +78,7 @@ export default function ScenarioHistory({ onRerun }) {
                 onClick={() => onRerun?.(entry)}
                 title="Re-run this scenario"
               >
-                <ArrowLeft size={13} aria-hidden="true" /> Re-run
+                <ArrowRight size={13} aria-hidden="true" /> Re-run
               </button>
               <button
                 className="btn btn-ghost btn-sm btn-danger"
@@ -111,4 +93,9 @@ export default function ScenarioHistory({ onRerun }) {
       </div>
     </section>
   );
+}
+
+function getDeltaClass(delta) {
+  if (delta == null || Math.abs(delta) < 0.5) return "neutral";
+  return delta > 0 ? "negative" : "positive";
 }

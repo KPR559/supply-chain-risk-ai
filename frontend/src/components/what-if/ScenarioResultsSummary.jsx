@@ -1,77 +1,69 @@
 import React from "react";
-import { formatEta, formatDelay, formatPercent, formatResilience, getRiskLevelClass } from "../../utils/whatIfUtils.js";
+import { formatEta, formatEtaDate, formatPercent, formatResilience, getRiskLevelClass } from "../../utils/whatIfUtils.js";
 
-export default function ScenarioResultsSummary({
-  baseline,
-  scenario,
-  checkpoint,
-  selectedPreset,
-}) {
-  if (!scenario) return null;
+export default function ScenarioResultsSummary({ result, prediction }) {
+  if (!result) return null;
 
-  const mc = scenario.monte_carlo || scenario;
-  const baselineMc = baseline?.monte_carlo || baseline;
+  const baseline = result.baseline || {};
+  const scenario = result.scenario || {};
+  const delta = result.delta || {};
+  const mc = result.monte_carlo || {};
 
-  // Extract values with fallbacks
-  const predictedEta = mc?.expected_eta_date || baselineMc?.expected_eta_date || null;
-  const p50Eta = mc?.percentiles?.p50 || mc?.expected_eta_days || null;
-  const p90Eta = mc?.percentiles?.p90 || null;
-  const expectedDelay = mc?.expected_delay_hours ? mc.expected_delay_hours / 24 : null;
-  const delayChange = mc?.delta_expected_days || null;
-  const missProb = mc?.p_miss_deadline || mc?.delay_probability || 0;
-  const resilience = mc?.resilience_score || baselineMc?.resilience_score || null;
-  const resilienceChange = mc?.delta_resilience || null;
-
-  const riskClass = getRiskLevelClass(missProb);
+  const riskClass = getRiskLevelClass(scenario.p_miss_deadline ?? mc.p_miss_deadline);
+  const originDate = mc.origin_date || prediction?.prediction_date;
 
   const metrics = [
     {
       label: "Scenario",
-      value: selectedPreset?.name || scenario.scenario || "Custom",
-      icon: null,
+      value: result.scenario_name || "Custom",
+      sub: result.scope ? `Scope: ${result.scope}` : null,
     },
     {
-      label: "Selected Checkpoint",
-      value: checkpoint?.label || checkpoint?.node_id || "—",
-      icon: null,
+      label: "Affected",
+      value: (result.affected_nodes || []).length
+        ? (result.per_node_scenario || [])
+            .filter((n) => (result.affected_nodes || []).includes(n.node_id))
+            .map((n) => n.label)
+            .slice(0, 3)
+            .join(", ")
+        : "None",
+      sub: (result.affected_nodes || []).length > 3 ? `+${result.affected_nodes.length - 3} more` : null,
     },
     {
-      label: "Predicted ETA",
-      value: predictedEta ? new Date(predictedEta).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—",
-      unit: null,
+      label: "Expected Transit",
+      value: formatEta(scenario.expected_days),
+      change: delta.expected_days,
+      unit: "days",
     },
     {
-      label: "P50 Arrival",
-      value: p50Eta != null ? formatEta(p50Eta) : "—",
-      unit: null,
+      label: "ETA Date",
+      value: formatEtaDate(mc.expected_eta_date || mc.eta_date?.p90),
+      sub: mc.expected_eta_date && mc.deadline_date ? `Deadline: ${formatEtaDate(mc.deadline_date)}` : null,
     },
     {
-      label: "P90 Arrival",
-      value: p90Eta != null ? formatEta(p90Eta) : "—",
-      unit: null,
+      label: "P50 / P90 ETA",
+      value: `${formatEta(scenario.p50_eta_days)} / ${formatEta(scenario.p90_eta_days)}`,
     },
     {
       label: "Expected Delay",
-      value: expectedDelay != null ? formatDelay(expectedDelay) : "—",
-      unit: null,
-    },
-    {
-      label: "Delay Change",
-      value: delayChange != null ? (delayChange > 0 ? `+${delayChange.toFixed(1)}` : delayChange.toFixed(1)) : "—",
+      value: scenario.expected_delay_hours != null
+        ? `${scenario.expected_delay_hours.toFixed(1)}h (${(scenario.expected_delay_hours / 24).toFixed(1)}d)`
+        : "—",
+      change: delta.delay_hours_change != null ? delta.delay_hours_change / 24 : null,
       unit: "days",
-      change: delayChange,
     },
     {
       label: "Deadline Miss Risk",
-      value: formatPercent(missProb),
-      unit: null,
+      value: formatPercent(scenario.p_miss_deadline),
+      change: delta.deadline_risk_change_pct,
+      unit: "pp",
       riskClass,
     },
     {
       label: "Resilience Score",
-      value: resilience != null ? formatResilience(resilience) : "—",
-      unit: null,
-      change: resilienceChange,
+      value: formatResilience(scenario.resilience_score),
+      change: delta.resilience_change,
+      unit: "pts",
     },
   ];
 
@@ -87,13 +79,14 @@ export default function ScenarioResultsSummary({
             <div className="result-label">{metric.label}</div>
             <div className="result-value">
               {metric.value}
-              {metric.unit && <span className="result-unit">{metric.unit}</span>}
               {metric.change != null && (
                 <span className={`result-change ${metric.change > 0 ? "increase" : metric.change < 0 ? "decrease" : "neutral"}`}>
-                  {metric.change > 0 ? "+" : ""}{metric.change.toFixed(1)} {metric.unit || "days"}
+                  {metric.change > 0 ? "+" : ""}
+                  {metric.change.toFixed(1)} {metric.unit || "days"}
                 </span>
               )}
             </div>
+            {metric.sub && <div className="result-sub">{metric.sub}</div>}
           </div>
         ))}
       </div>

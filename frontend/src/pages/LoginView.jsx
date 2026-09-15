@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { DEFAULT_CREDENTIALS } from "../auth.js";
 import { api } from "../api.js";
 import loginVideo from "../video/Screen Recording 2026-09-14 at 10.32.11\u202FPM.mov";
 
@@ -32,15 +31,6 @@ export default function LoginView({ onLogin, onRegister }) {
     setShowForgot(false);
     setForgotError(null);
     setForgotSuccess(null);
-  };
-
-  const fillDemo = () => {
-    setUsername(DEFAULT_CREDENTIALS.username);
-    setPassword(DEFAULT_CREDENTIALS.password);
-    setRemember(true);
-    setShowForgot(false);
-    setError(null);
-    setSuccess(null);
   };
 
   const handleForgotRequest = async (e) => {
@@ -281,12 +271,6 @@ export default function LoginView({ onLogin, onRegister }) {
           <button className="btn login-btn" type="submit" disabled={busy}>
             {busy ? (isSignup ? "Creating account…" : "Signing in…") : isSignup ? "Create account →" : "Sign in →"}
           </button>
-
-          {!isSignup && !showForgot && (
-            <button type="button" className="link-btn" onClick={fillDemo}>
-              Use demo account
-            </button>
-          )}
 
           {!isSignup && !showForgot && (
             <button type="button" className="link-btn" onClick={() => setShowForgot(true)}>

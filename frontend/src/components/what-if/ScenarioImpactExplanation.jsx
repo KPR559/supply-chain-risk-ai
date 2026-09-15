@@ -1,11 +1,11 @@
 import React from "react";
 import { Info } from "lucide-react";
-import { generateScenarioImpact } from "../../utils/whatIfUtils.js";
 
-export default function ScenarioImpactExplanation({ baseline, scenario, checkpoint, adjustments }) {
-  if (!baseline || !scenario) return null;
+export default function ScenarioImpactExplanation({ result }) {
+  const explanation = result?.impact_explanation;
+  if (!explanation) return null;
 
-  const explanation = generateScenarioImpact(baseline, scenario, checkpoint, adjustments);
+  const reasons = explanation.reasons || [];
 
   return (
     <section className="panel what-if-impact-explanation">
@@ -14,7 +14,14 @@ export default function ScenarioImpactExplanation({ baseline, scenario, checkpoi
         <Info size={16} aria-hidden="true" className="info-icon" />
       </div>
       <div className="explanation-content">
-        <p>{explanation}</p>
+        <p className="impact-summary">{explanation.summary}</p>
+        {reasons.length > 0 && (
+          <ul className="impact-reasons">
+            {reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
-import { clearSession, getSession, saveSession, updateSessionTokens } from "./auth.js";
+import { clearSession, getSession, saveSession, updateSessionTokens, updateSessionUser } from "./auth.js";
 import { getStoredTheme, applyTheme } from "./theme.js";
 import {
   loadSelectedId,
   loadShipments,
+  migrateUserKeys,
   saveSelectedId,
   saveShipments,
 } from "./shipments.js";
@@ -49,6 +50,7 @@ const VIEWS = {
 
 export default function App() {
   const [user, setUser] = useState(() => getSession()?.username || null);
+  const [avatar, setAvatar] = useState(() => getSession()?.avatar || null);
   const [token, setToken] = useState(() => getSession()?.token || null);
   const [view, setView] = useState("results");
   const [route, setRoute] = useState(DEFAULT_ROUTE);
@@ -242,6 +244,7 @@ export default function App() {
       saveSession(res.username || username, access, remember, refresh);
       setUser(res.username || username);
       setToken(access);
+      if (res.avatar !== undefined) setAvatar(res.avatar);
       return null;
     } catch (e) {
       if (e.status === 429) return "Too many attempts, please wait a minute.";
@@ -273,6 +276,7 @@ export default function App() {
     clearSession();
     setUser(null);
     setToken(null);
+    setAvatar(null);
     setPrediction(null);
     setExplanation(null);
     setCritical(null);
@@ -290,12 +294,45 @@ export default function App() {
     clearSession();
     setUser(null);
     setToken(null);
+    setAvatar(null);
     setPrediction(null);
     setExplanation(null);
     setCritical(null);
     setError(null);
     setView("results");
     return null;
+  };
+
+  const handleUpdateAvatar = async (avatarUrl) => {
+    if (!token) return "Not signed in.";
+    try {
+      await api.updateProfile(avatarUrl, token);
+      setAvatar(avatarUrl);
+      return null;
+    } catch (e) {
+      return e.message || "Failed to update profile picture.";
+    }
+  };
+
+  const handleChangeUsername = async (newUsername) => {
+    if (!token) return "Not signed in.";
+    const oldName = user;
+    try {
+      const res = await api.changeUsername(newUsername, token);
+      const next = res.username || newUsername;
+      const access = res.access_token || res.token;
+      const refresh = res.refresh_token || null;
+      // carry the per-account shipment registry + selection to the new handle
+      migrateUserKeys(oldName, next);
+      updateSessionUser(next, access, refresh);
+      setUser(next);
+      setToken(access);
+      if (res.avatar !== undefined) setAvatar(res.avatar);
+      return null;
+    } catch (e) {
+      if (e.status === 409) return "That username is already taken.";
+      return e.message || "Rename failed. Is the API running?";
+    }
   };
 
   // Re-validate any restored session against the backend on startup.
@@ -316,6 +353,7 @@ export default function App() {
       .then((me) => {
         if (!alive) return;
         setUser(me.username || s.username);
+        if (me.avatar !== undefined) setAvatar(me.avatar);
         setToken(s.token);
       })
       .catch((e) => {
@@ -331,6 +369,7 @@ export default function App() {
               updateSessionTokens(newAccess, newRefresh);
               setUser(res.username || s.username);
               setToken(newAccess);
+              if (res.avatar !== undefined) setAvatar(res.avatar);
             })
             .catch(() => {
               if (!alive) return;
@@ -390,6 +429,9 @@ export default function App() {
     apiError: error,
     lastUpdated,
     user,
+    avatar,
+    onUpdateAvatar: handleUpdateAvatar,
+    onChangeUsername: handleChangeUsername,
     onLogout: handleLogout,
     onDeleteAccount: handleDeleteAccount,
     onNavigate: setView,
@@ -416,6 +458,7 @@ export default function App() {
         active={sidebarActive}
         onSelect={setView}
         user={user}
+        avatar={avatar}
         onLogout={handleLogout}
         onOpenAlerts={() => {
           setView("results");

@@ -29,7 +29,7 @@ export default function WhatIfView({ data }) {
         loadingText="Loading baseline…"
       />
 
-      {ready && <WhatIfPanel prediction={prediction} />}
+      {ready && <WhatIfPanel prediction={prediction} shipments={data.shipments} />}
     </div>
   );
 }

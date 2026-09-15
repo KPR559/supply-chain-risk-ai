@@ -1,6 +1,5 @@
 import React from "react";
-import { AlertTriangle, AlertCircle, CheckCircle, Info } from "lucide-react";
-import { generateRecommendations } from "../../utils/whatIfUtils.js";
+import { AlertTriangle, AlertCircle, Info, ArrowRight } from "lucide-react";
 
 const priorityIcons = {
   critical: AlertTriangle,
@@ -16,15 +15,17 @@ const priorityLabels = {
   low: "Low",
 };
 
-export default function RecommendedActions({ baseline, scenario, checkpoint, adjustments, alternativeRoutes }) {
-  if (!baseline || !scenario) return null;
+export default function RecommendedActions({ result }) {
+  const recommendations = result?.recommendations || null;
+  const altRoutes = result?.alternative_routes || [];
+  if (!recommendations && altRoutes.length === 0) return null;
 
-  const recommendations = generateRecommendations(baseline, scenario, checkpoint, adjustments, alternativeRoutes);
+  const topAlt = altRoutes[0];
 
   return (
     <section className="panel what-if-recommendations">
       <h2>Recommended Actions</h2>
-      <p className="muted">Suggested next steps based on scenario results</p>
+      <p className="muted">Suggested next steps based on the scenario simulation</p>
 
       <div className="recommendations-list">
         {recommendations.map((rec, idx) => {
@@ -36,10 +37,16 @@ export default function RecommendedActions({ baseline, scenario, checkpoint, adj
               </div>
               <div className="rec-content">
                 <div className="rec-header">
-                  <strong>{rec.title}</strong>
+                  <strong>{rec.action}</strong>
                   <span className={`rec-priority ${rec.priority}`}>{priorityLabels[rec.priority]}</span>
                 </div>
-                <p className="rec-text">{rec.text}</p>
+                <p className="rec-text">{rec.reason}</p>
+                {rec.expected_benefit && (
+                  <p className="rec-benefit">
+                    <ArrowRight size={12} aria-hidden="true" />
+                    {rec.expected_benefit}
+                  </p>
+                )}
               </div>
             </div>
           );

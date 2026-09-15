@@ -6,23 +6,24 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.app.schemas.models import (ChangePasswordRequest, CompareRoutesRequest,
-                                     ForgotRequest, LoginRequest, PredictRequest,
-                                     RegisterRequest, ResetRequest,
-                                     ScenarioAdjustment, SimulateRequest,
-                                     WhatIfRequest)
+from backend.app.schemas.models import (ChangePasswordRequest, ChangeUsernameRequest,
+                                     CompareRoutesRequest, ForgotRequest, LoginRequest,
+                                     PredictRequest, RegisterRequest, ResetRequest,
+                                     ScenarioAdjustment, SimulateRequest, UpdateProfileRequest,
+                                     WhatIfRequest, NodeAdjustment)
 from backend.core import storage
 from backend.core.auth import (UsernameTakenError, authenticate, change_password,
-                               check_rate_limit, create_reset_token, delete_user,
-                               issue_token_pair, register_user, reset_password_with_token,
-                               revoke_token, verify_refresh_token, verify_token)
+                               change_username, check_rate_limit, create_reset_token,
+                               delete_user, get_profile, issue_token_pair, register_user,
+                               reset_password_with_token, revoke_token, update_profile,
+                               verify_refresh_token, verify_token)
 from backend.core.config import get_settings
 from backend.core.graph import topology
 from backend.core.graph.layout import build_map_analytics
 from backend.core.logging_util import get_logger, log_with
 from backend.core.models import classification, delay, registry
 from backend.core.predictor import get_engine
-from backend.core.routing.routes import run_scenario, Scenario
+from backend.core.routing.routes import run_scenario, Scenario, run_whatif_scenario, build_whatif_presets
 
 log = get_logger(__name__)
 
@@ -109,6 +110,7 @@ def _client_ip(request: Request) -> str:
 def _issue_pair_response(username: str, status_code: int = 200):
     pair = issue_token_pair(username)
     s = get_settings()
+    profile = get_profile(username) or {}
     # HttpOnly refresh cookie (7d), SameSite Lax so top-level navigation works
     from fastapi.responses import JSONResponse
     resp = JSONResponse({
@@ -116,6 +118,7 @@ def _issue_pair_response(username: str, status_code: int = 200):
         "access_token": pair["access_token"],
         "refresh_token": pair["refresh_token"],
         "username": username,
+        "avatar": profile.get("avatar"),
         "expires_at": pair.get("expires_at"),
     }, status_code=status_code)
     resp.set_cookie(
@@ -176,7 +179,7 @@ def me(request: Request) -> Dict[str, Any]:
     username = verify_token(_bearer_token(request))
     if username is None:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
-    return {"username": username}
+    return get_profile(username) or {"username": username, "avatar": None, "created_at": None}
 
 
 @router.post("/refresh")
@@ -224,6 +227,30 @@ def change_password_route(req: ChangePasswordRequest, request: Request) -> Dict[
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"status": "ok"}
+
+
+@router.patch("/account/profile")
+def update_profile_route(req: UpdateProfileRequest, request: Request) -> Dict[str, Any]:
+    username = verify_token(_bearer_token(request))
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    profile = update_profile(username, avatar=req.avatar)
+    return {"status": "ok", "profile": profile}
+
+
+@router.post("/account/username")
+def change_username_route(req: ChangeUsernameRequest, request: Request) -> Dict[str, Any]:
+    username = verify_token(_bearer_token(request))
+    if username is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    try:
+        new_username = change_username(username, req.new_username)
+    except UsernameTakenError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # issue a fresh token pair under the new handle so the session stays valid
+    return _issue_pair_response(new_username)
 
 
 @router.delete("/account")
@@ -428,35 +455,47 @@ def simulate(req: SimulateRequest) -> Dict[str, Any]:
 @router.post("/what-if")
 def whatif(req: WhatIfRequest) -> Dict[str, Any]:
     shipment = _load(req.shipment_id)
-    eng = get_engine()
-    scenario_payload = {"name": req.name}
-    adj = req.adjustments or ScenarioAdjustment()
-    if req.node_id:
-        valid_nodes = {n["node_id"] for n in shipment["node_predictions"]}
-        if req.node_id not in valid_nodes:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Checkpoint '{req.node_id}' is not on this shipment's route",
-            )
-        scenario_payload["node_id"] = req.node_id
-        d = adj.model_dump()
-        scenario_payload.update({k: v for k, v in d.items() if v is not None})
+    s = get_settings()
+
+    # Build adjustments from the new request shape
+    adjustments = None
+    if req.adjustments:
+        adjustments = req.adjustments.model_dump()
+    node_adjustments_list = None
+    if req.node_adjustments:
+        node_adjustments_list = [na.model_dump() for na in req.node_adjustments]
+    route_adjustments = None
+    if req.route_adjustments:
+        route_adjustments = req.route_adjustments.model_dump()
+
     log.info("what-if", extra={"extra_fields": {"shipment": req.shipment_id,
-                                                "scenario": req.name}})
-    result = eng.whatif(shipment, scenario_payload)
-    baseline = shipment["monte_carlo"]
-    sc = result["monte_carlo"]
-    bp = baseline.get("percentiles", {})
-    sp = sc.get("percentiles", {})
-    result["baseline"] = {
-        "expected_days": baseline.get("expected_days"),
-        "expected_delay_hours": baseline.get("expected_delay_hours"),
-        "percentiles": bp,
-    }
-    result["delta_expected_days"] = round(sc.get("expected_days", 0.0)
-                                          - baseline.get("expected_days", 0.0), 2)
-    result["delta_p90_days"] = round(sp.get("p90", 0.0) - bp.get("p90", 0.0), 2)
+                                                "scenario": req.name,
+                                                "type": req.scenario_type}})
+    result = run_whatif_scenario(
+        shipment=shipment,
+        scenario_type=req.scenario_type,
+        scope=req.scope,
+        node_id=req.node_id,
+        node_ids=req.node_ids,
+        segment_start=req.segment_start,
+        segment_end=req.segment_end,
+        adjustments=adjustments,
+        node_adjustments_list=node_adjustments_list,
+        route_adjustments=route_adjustments,
+        n_sim=None,
+        seed=s.demo_seed,
+    )
     return result
+
+
+@router.get("/what-if/presets/{route_id}")
+def whatif_presets(route_id: str) -> Dict[str, Any]:
+    route_id = _resolve_route_id(route_id)
+    r = topology.route_by_id(route_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail=f"Unknown route {route_id}")
+    presets = build_whatif_presets(route_id)
+    return {"route_id": route_id, "presets": presets}
 
 
 @router.post("/compare-routes")

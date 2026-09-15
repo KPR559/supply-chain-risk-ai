@@ -486,6 +486,21 @@ class PredictionEngine:
 
     def compare(self, shipment: Dict, objectives: List[str]) -> Dict:
         self.ensure_ready()
+
+        # Determine origin / destination nodes from the shipment's own route
+        # so we only surface corridors that actually serve this corridor.
+        current_route = topology.route_by_id(shipment["route_id"])
+        origin_node = current_route.node_ids[0]
+        dest_node = current_route.node_ids[-1]
+
+        # Only simulate routes that start at the same origin and either end
+        # at the destination or pass through it (multi-stop routes).
+        relevant_ids = [
+            r.route_id for r in topology.ROUTES
+            if r.node_ids[0] == origin_node
+            and (r.node_ids[-1] == dest_node or dest_node in r.node_ids)
+        ]
+
         quantiles = {k: {"p50": v["p50"], "p80": v["p80"], "p90": v["p90"]}
                      for k, v in shipment["delay_quantiles"].items()}
         mc = shipment["monte_carlo"]
@@ -496,7 +511,9 @@ class PredictionEngine:
             deadline_days = (pd.Timestamp(deadline) - base).days
         opts = compare_routes(quantiles, deadline_days=deadline_days,
                               n_sim=get_settings().mc_simulations,
-                              seed=get_settings().mc_seed)
+                              seed=get_settings().mc_seed,
+                              route_ids=relevant_ids)
+
         # recommendations from the internal option records (simulation outputs)
         internal = [
             {
@@ -515,9 +532,41 @@ class PredictionEngine:
             recs[obj] = rec["recommended_route_id"]
             scores_by_objective[obj] = {o["route_id"]: round(float(o["score"]), 3)
                                         for o in rec["options"]}
-        options = [
-            {
-                "route_id": o.route.route_id, "route_name": o.route.name,
+
+        # Build a per-route reason explaining why it is (or isn't) recommended
+        origin_label = topology.node_label(origin_node)
+        dest_label = topology.node_label(dest_node)
+        balanced_rec = recs.get("balanced", recs.get("fastest", ""))
+        fastest_rec = recs.get("fastest", "")
+        safest_rec = recs.get("lowest_risk", "")
+
+        options = []
+        for o in opts:
+            rid = o.route.route_id
+            nodes = o.route.node_ids
+            is_current = (rid == shipment["route_id"])
+            is_balanced = (rid == balanced_rec)
+            is_fastest = (rid == fastest_rec)
+            is_safest = (rid == safest_rec)
+            passes_through = dest_node in nodes and nodes[-1] != dest_node
+            final_dest = topology.node_label(nodes[-1])
+
+            reasons = []
+            if is_current:
+                reasons.append(f"Your current corridor ({origin_label} → {dest_label}).")
+            if passes_through:
+                reasons.append(f"Passes through {dest_label} on the way to {final_dest}.")
+            if is_fastest:
+                reasons.append("Fastest option for this corridor.")
+            if is_safest:
+                reasons.append("Lowest delay risk among available routes.")
+            if is_balanced:
+                reasons.append("Best overall balance of speed, risk, and resilience.")
+            if not reasons:
+                reasons.append(f"Alternative corridor ({origin_label} → {final_dest}).")
+
+            options.append({
+                "route_id": rid, "route_name": o.route.name,
                 "baseline_days": round(o.baseline_days, 1),
                 "distance_km": round(o.distance_km, 0),
                 "expected_eta_days": round(o.expected_days, 1),
@@ -527,11 +576,11 @@ class PredictionEngine:
                 "uncertainty_days": round(o.uncertainty, 1),
                 "resilience": round(100.0 * (1.0 - o.delay_probability)
                                     * (1.0 - 0.5 * min(1.0, o.uncertainty / max(o.baseline_days, 0.5))), 1),
-                "scores": {obj: scores_by_objective[obj][o.route.route_id]
+                "scores": {obj: scores_by_objective[obj][rid]
                            for obj in objectives},
-            }
-            for o in opts
-        ]
+                "is_current": is_current,
+                "reasons": reasons,
+            })
         return {"options": options, "recommended": recs}
 
 

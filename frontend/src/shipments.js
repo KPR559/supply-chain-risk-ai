@@ -120,6 +120,16 @@ export function loadShipments(username) {
     if (changed) write(userKey(STORE_KEY, username), list);
     return list;
   }
+  // Fallback: if this username has no stored data yet, check whether the
+  // built-in "admin" key still holds shipments from a recent rename.
+  if (username && username.toLowerCase() !== "admin") {
+    const adminData = read(userKey(STORE_KEY, "admin"));
+    if (adminData !== null && Array.isArray(adminData) && adminData.length > 0) {
+      write(userKey(STORE_KEY, username), adminData);
+      drop(userKey(STORE_KEY, "admin"));
+      return migrateList(adminData).list;
+    }
+  }
   const legacy = read(STORE_KEY);
   if (Array.isArray(legacy) && legacy.length > 0) {
     const { list } = migrateList(legacy);
@@ -127,8 +137,6 @@ export function loadShipments(username) {
     drop(STORE_KEY);
     return list;
   }
-  // New accounts start empty. Only the default admin is seeded with demo data
-  // so the dashboard isn't blank on first ever run.
   if (username && username.toLowerCase() === "admin") {
     return SEED.map((s) => ({ ...s }));
   }
@@ -142,6 +150,15 @@ export function saveShipments(list, username) {
 export function loadSelectedId(username) {
   const saved = read(userKey(SELECTED_KEY, username));
   if (typeof saved === "string") return saved;
+  // Fallback: check the "admin" key for a recently renamed account
+  if (username && username.toLowerCase() !== "admin") {
+    const adminSel = read(userKey(SELECTED_KEY, "admin"));
+    if (typeof adminSel === "string") {
+      write(userKey(SELECTED_KEY, username), adminSel);
+      drop(userKey(SELECTED_KEY, "admin"));
+      return adminSel;
+    }
+  }
   const legacy = read(SELECTED_KEY);
   if (typeof legacy === "string") {
     write(userKey(SELECTED_KEY, username), legacy);
@@ -153,6 +170,26 @@ export function loadSelectedId(username) {
 
 export function saveSelectedId(id, username) {
   write(userKey(SELECTED_KEY, username), id);
+}
+
+export function migrateUserKeys(oldUsername, newUsername) {
+  // Account rename: move the shipment registry and selection under the new
+  // per-account namespace so no stored data is orphaned.
+  if (!oldUsername || !newUsername || oldUsername.toLowerCase() === newUsername.toLowerCase()) return;
+  const fromStore = userKey(STORE_KEY, oldUsername);
+  const toStore = userKey(STORE_KEY, newUsername);
+  const fromSel = userKey(SELECTED_KEY, oldUsername);
+  const toSel = userKey(SELECTED_KEY, newUsername);
+  const oldData = read(fromStore);
+  if (oldData !== null) {
+    write(toStore, oldData);
+    drop(fromStore);
+  }
+  const oldSel = read(fromSel);
+  if (oldSel !== null) {
+    write(toSel, oldSel);
+    drop(fromSel);
+  }
 }
 
 export function blankShipment() {

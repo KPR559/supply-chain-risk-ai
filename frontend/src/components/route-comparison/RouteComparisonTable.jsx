@@ -13,7 +13,7 @@ export default function RouteComparisonTable({ routes, recommendation, onSelectR
             <th>Route</th>
             <th className="numeric">ETA (P50)</th>
             <th className="numeric">P90 ETA</th>
-            <th className="numeric">Delay Risk</th>
+            <th>Delay Risk</th>
             <th className="numeric">Distance</th>
             <th className="numeric">Resilience</th>
           </tr>

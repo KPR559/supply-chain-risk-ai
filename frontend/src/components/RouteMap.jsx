@@ -7,15 +7,6 @@ import { api } from "../api.js";
 import { riskColor, riskClass } from "../utils/helpers.js";
 import { loadUiPrefs } from "../prefs.js";
 
-const SHORT_NAMES = {
-  asia_europe_suez: "Suez",
-  asia_europe_cape: "Cape",
-  trans_pacific: "Trans-Pac",
-  asia_us_east_panama: "Panama",
-  suez: "Suez",
-  cape: "Cape",
-  dubai: "Dubai",
-};
 const KIND_LABELS = {
   origin: "Origin",
   warehouse: "Hub",
@@ -88,17 +79,15 @@ const CY_STYLE = [
   { selector: "edge.risk-med", style: { "line-color": "#f59e0b" } },
   { selector: "edge.risk-high", style: { "line-color": "#ef4444" } },
   { selector: "edge.route-active", style: { width: 2.4, opacity: 0.85 } },
-  { selector: "edge.route-alt", style: { "line-color": "#3d4d6d", width: 1.5, opacity: 0.35 } },
 ];
 
 export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
   const [routes, setRoutes] = useState([]);
   const [failed, setFailed] = useState(false);
-  const [visible, setVisible] = useState({});
   const [hover, setHover] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [layout, setLayout] = useState(() => (loadUiPrefs().mapLayout === "graph" ? "graph" : "world")); // 'world' | 'graph'
-  const [view, setView] = useState({ x: 0, y: 0, z: 1 }); // shared cy pan/zoom for the bg layer
+  const [layout, setLayout] = useState(() => (loadUiPrefs().mapLayout === "graph" ? "graph" : "world"));
+  const [view, setView] = useState({ x: 0, y: 0, z: 1 });
   const wrapRef = useRef(null);
   const cyRef = useRef(null);
 
@@ -133,25 +122,15 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
     let alive = true;
     (async () => {
       try {
-        const g = await api.graphs();
+        const r = await api.graph(activeRouteId);
         if (!alive) return;
-        setRoutes(g.routes || []);
-        setVisible(Object.fromEntries((g.routes || []).map((r) => [r.route_id, true])));
+        setRoutes([r]);
       } catch (e) {
-        try {
-          const list = await Promise.all(["suez", "cape", "dubai"].map((rid) => api.graph(rid)));
-          if (!alive) return;
-          setRoutes(list);
-          setVisible(Object.fromEntries(list.map((r) => [r.route_id, true])));
-        } catch (e2) {
-          if (alive) setFailed(true);
-        }
+        if (alive) setFailed(true);
       }
     })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    return () => { alive = false; };
+  }, [activeRouteId]);
 
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -312,12 +291,10 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
       });
     }
     for (const route of routes) {
-      if (!visible[route.route_id]) continue;
-      const isActive = route.route_id === activeRouteId;
       for (const e of route.edges) {
+        if (!merged[e.src] || !merged[e.dst]) continue;
         const a = merged[e.src];
         const b = merged[e.dst];
-        if (!a || !b) continue;
         const midProb = (a.prob + b.prob) / 2;
         cy.add({
           group: "edges",
@@ -330,9 +307,9 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
             baseline_days: e.baseline_days,
             srcLabel: a.label || e.src,
             dstLabel: b.label || e.dst,
-            label: isActive ? `~${e.baseline_days}d` : "",
+            label: `~${e.baseline_days}d`,
           },
-          classes: `mode-${e.mode} risk-${riskClass(midProb)} ${isActive ? "route-active" : "route-alt"}`,
+          classes: `mode-${e.mode} risk-${riskClass(midProb)} route-active`,
         });
       }
     }
@@ -341,9 +318,8 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
     cy.layout({ name: "preset", fit: true, padding: 45 }).run();
     const p = cy.pan();
     setView({ x: p.x, y: p.y, z: cy.zoom() });
-  }, [routes, visible, activeRouteId, merged, layout]);
+  }, [routes, activeRouteId, merged, layout]);
 
-  const toggle = (rid) => setVisible((v) => ({ ...v, [rid]: !v[rid] }));
 
   const zoomBy = (factor) => {
     const cy = cyRef.current;
@@ -366,25 +342,6 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
   return (
     <div>
       <div className="route-toggles">
-        {routes.map((r) => {
-          const on = visible[r.route_id];
-          const isActive = r.route_id === activeRouteId;
-          const dist = Math.round(r.edges.reduce((s, e) => s + e.distance_km, 0));
-          const days = r.edges.reduce((s, e) => s + e.baseline_days, 0);
-          return (
-            <button
-              key={r.route_id}
-              className={`route-chip ${on ? "on" : "off"} ${isActive ? "active" : ""}`}
-              onClick={() => toggle(r.route_id)}
-              title={on ? "Hide this route" : "Show this route"}
-            >
-              <span className="chip-dot" />
-              {isActive ? "★ " : ""}
-              {SHORT_NAMES[r.route_id] || r.route_id}
-              <span className="chip-meta">· {dist.toLocaleString()} km · ~{Math.round(days)}d</span>
-            </button>
-          );
-        })}
         <span className="seg" role="group" aria-label="Map layout">
           <button className={`seg-btn ${layout === "world" ? "on" : ""}`} onClick={() => setLayout("world")} title="Geographic world map (lon/lat projection)">World</button>
           <button className={`seg-btn ${layout === "graph" ? "on" : ""}`} onClick={() => setLayout("graph")} title="Graph schematic layout">Graph</button>
