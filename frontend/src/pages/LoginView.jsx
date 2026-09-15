@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { DEFAULT_CREDENTIALS } from "../auth.js";
 import { api } from "../api.js";
-import loginVideo from "../video/Screen Recording 2026-09-14 at 10.32.11\u202FPM.mov";
+import loginVideo from "../video/Video Project.mp4";
 
 export default function LoginView({ onLogin, onRegister }) {
   const [mode, setMode] = useState("signin");
