@@ -30,9 +30,13 @@ export function formatShortDate(iso) {
 
 export function routeDisplayName(routeId) {
   const names = {
-    suez: "Current Route (Suez)",
-    cape: "Cape of Good Hope",
-    dubai: "Alternate Transshipment",
+    asia_europe_suez: "Asia–Europe via Suez",
+    asia_europe_cape: "Asia–Europe via Cape",
+    trans_pacific: "Trans-Pacific Direct",
+    asia_us_east_panama: "Asia–US East via Panama",
+    suez: "Asia–Europe via Suez",
+    cape: "Asia–Europe via Cape",
+    dubai: "Asia–Europe via Suez",
   };
   return names[routeId] || routeId;
 }

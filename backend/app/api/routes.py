@@ -50,9 +50,13 @@ def _load(shipment_id: str) -> Dict:
 
 def _run_demo_prediction() -> Dict:
     eng = get_engine()
+    route_id = topology.DEFAULT_ROUTE
+    r = topology.route_by_id(route_id)
+    origin = r.node_ids[0]
+    destination = r.node_ids[-1]
     return eng.predict_shipment(
-        "frankfurt", "final_destination", route_id="suez",
-        current_checkpoint="suez",
+        origin, destination, route_id=route_id,
+        current_checkpoint=origin,
         deadline_date=None,
         seed=get_settings().demo_seed,
     )
@@ -61,12 +65,16 @@ def _run_demo_prediction() -> Dict:
 @router.get("/health")
 def health() -> Dict[str, Any]:
     s = get_settings()
+    try:
+        warehouse = storage.warehouse_tables()
+    except Exception:
+        warehouse = []
     return {
         "status": "ok",
         "models": registry.list_models(),
         "data": {
             "datasets": storage.list_datasets(),
-            "warehouse": storage.warehouse_tables(),
+            "warehouse": warehouse,
             "graph_backend": s.graph_backend,
             "nlp_engine": s.nlp_engine,
             "mc_simulations": s.mc_simulations,
@@ -253,8 +261,13 @@ def list_routes() -> Dict[str, Any]:
     }
 
 
+def _resolve_route_id(route_id: str) -> str:
+    return topology.resolve_route_id(route_id)
+
+
 @router.get("/routes/{route_id}")
 def get_route(route_id: str) -> Dict[str, Any]:
+    route_id = _resolve_route_id(route_id)
     r = topology.route_by_id(route_id)
     if r is None:
         raise HTTPException(status_code=404, detail=f"Unknown route {route_id}")
@@ -280,9 +293,10 @@ def get_route(route_id: str) -> Dict[str, Any]:
 @router.post("/predict")
 def predict(req: PredictRequest) -> Dict[str, Any]:
     eng = get_engine()
+    route_id = _resolve_route_id(req.route_id)
     try:
         payload = eng.predict_shipment(
-            req.origin, req.destination, route_id=req.route_id,
+            req.origin, req.destination, route_id=route_id,
             current_checkpoint=req.current_checkpoint,
             deadline_date=req.deadline_date,
             origin_date=req.origin_date,
@@ -320,12 +334,13 @@ def get_eta(shipment_id: str) -> Dict[str, Any]:
 # so a small n_sim is enough for visualisation.
 # ---------------------------------------------------------------------------
 def _route_graph(route_id: str, demo_n_sim: int = 100) -> Dict[str, Any]:
+    route_id = _resolve_route_id(route_id)
     r = topology.route_by_id(route_id)
     if r is None:
         raise HTTPException(status_code=404, detail=f"Unknown route {route_id}")
     try:
         eng = get_engine()
-        demo = eng.predict_shipment("frankfurt", "final_destination",
+        demo = eng.predict_shipment(r.node_ids[0], r.node_ids[-1],
                                     route_id=route_id,
                                     n_sim=demo_n_sim,
                                     seed=get_settings().demo_seed)
@@ -382,8 +397,10 @@ def node_risk(node_id: str) -> Dict[str, Any]:
     if node_id not in topology.node_index():
         raise HTTPException(status_code=404, detail=f"Unknown node {node_id}")
     eng = get_engine()
-    demo = eng.predict_shipment("frankfurt", "final_destination",
-                                route_id="suez", seed=get_settings().demo_seed)
+    route_id = topology.DEFAULT_ROUTE
+    r = topology.route_by_id(route_id)
+    demo = eng.predict_shipment(r.node_ids[0], r.node_ids[-1],
+                                route_id=route_id, seed=get_settings().demo_seed)
     for n in demo["node_predictions"]:
         if n["node_id"] == node_id:
             return n

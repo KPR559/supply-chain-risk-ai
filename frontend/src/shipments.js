@@ -14,7 +14,13 @@ export const STATUSES = [
 
 export const PRIORITIES = ["Low", "Medium", "High", "Critical"];
 
-export const ROUTE_IDS = ["suez", "cape", "dubai"];
+export const ROUTE_IDS = ["asia_europe_suez", "asia_europe_cape", "trans_pacific", "asia_us_east_panama"];
+
+// Back-compat: old localStorage may still hold suez/cape/dubai
+const ROUTE_ALIAS = { suez: "asia_europe_suez", cape: "asia_europe_cape", dubai: "asia_europe_suez" };
+function migrateRouteId(id) {
+  return ROUTE_ALIAS[id] || id;
+}
 
 const STORE_KEY = "scm.shipments.v1";
 const SELECTED_KEY = "scm.selectedShipment.v1";
@@ -29,45 +35,45 @@ function userKey(base, username) {
 const SEED = [
   {
     id: "SHP001",
-    origin: "Frankfurt, Germany",
-    destination: "Mumbai, India",
+    origin: "Shanghai, China",
+    destination: "Rotterdam, Netherlands",
     type: "Automotive Parts",
-    mode: "Sea + Road",
+    mode: "Sea",
     departureDate: "2026-09-10",
-    etaDate: "2026-09-25",
-    requiredDate: "2026-09-25",
+    etaDate: "2026-10-05",
+    requiredDate: "2026-10-05",
     priority: "High",
-    location: "Hamburg Port",
+    location: "Suez Canal",
     status: "In Transit",
-    routeId: "suez",
+    routeId: "asia_europe_suez",
   },
   {
     id: "SHP002",
-    origin: "Frankfurt, Germany",
-    destination: "Chennai, India",
+    origin: "Shanghai, China",
+    destination: "Rotterdam, Netherlands",
     type: "Electronics",
     mode: "Sea",
     departureDate: "2026-09-05",
-    etaDate: "2026-10-02",
-    requiredDate: "2026-10-01",
+    etaDate: "2026-10-10",
+    requiredDate: "2026-10-08",
     priority: "Medium",
     location: "Cape of Good Hope",
     status: "In Transit",
-    routeId: "cape",
+    routeId: "asia_europe_cape",
   },
   {
     id: "SHP003",
-    origin: "Frankfurt, Germany",
-    destination: "Mumbai, India",
+    origin: "Shanghai, China",
+    destination: "Los Angeles, USA",
     type: "Pharmaceuticals",
-    mode: "Sea + Air",
+    mode: "Sea",
     departureDate: "2026-09-12",
-    etaDate: "2026-09-28",
-    requiredDate: "2026-09-26",
+    etaDate: "2026-09-26",
+    requiredDate: "2026-09-25",
     priority: "Critical",
-    location: "Jebel Ali Port",
+    location: "Taiwan Strait",
     status: "Delayed",
-    routeId: "dubai",
+    routeId: "trans_pacific",
   },
 ];
 
@@ -96,15 +102,30 @@ function drop(key) {
   }
 }
 
+function migrateList(list) {
+  let changed = false;
+  const out = list.map((s) => {
+    const nid = migrateRouteId(s.routeId);
+    if (nid !== s.routeId) { changed = true; return { ...s, routeId: nid }; }
+    return s;
+  });
+  return { list: out, changed };
+}
+
 export function loadShipments(username) {
   const stored = read(userKey(STORE_KEY, username));
-  if (stored !== null) return Array.isArray(stored) ? stored : [];
+  if (stored !== null) {
+    const arr = Array.isArray(stored) ? stored : [];
+    const { list, changed } = migrateList(arr);
+    if (changed) write(userKey(STORE_KEY, username), list);
+    return list;
+  }
   const legacy = read(STORE_KEY);
   if (Array.isArray(legacy) && legacy.length > 0) {
-    // Adopt the old shared registry once, then drop it.
-    write(userKey(STORE_KEY, username), legacy);
+    const { list } = migrateList(legacy);
+    write(userKey(STORE_KEY, username), list);
     drop(STORE_KEY);
-    return legacy;
+    return list;
   }
   // New accounts start empty. Only the default admin is seeded with demo data
   // so the dashboard isn't blank on first ever run.
@@ -147,6 +168,6 @@ export function blankShipment() {
     priority: "Medium",
     location: "",
     status: "In Transit",
-    routeId: "suez",
+    routeId: "asia_europe_suez",
   };
 }

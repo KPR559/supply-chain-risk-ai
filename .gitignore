@@ -6,19 +6,6 @@ __pycache__/
 venv/
 env/
 
-# Models / artifacts
-artifacts/
-*.joblib
-*.pkl
-*.pth
-*.pt
-
-# Data (generated)
-data/raw/*.parquet
-data/silver/*.parquet
-data/gold/**/*.parquet
-data/*.duckdb
-
 # Node
 node_modules/
 dist/

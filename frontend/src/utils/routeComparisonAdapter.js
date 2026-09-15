@@ -65,6 +65,10 @@ function getRouteDisplayName(routeId) {
     cape: "Cape of Good Hope",
     transshipment: "Alternate Transshipment",
     dubai: "Alternate Transshipment",
+    asia_europe_suez: "Asia–Europe via Suez",
+    asia_europe_cape: "Asia–Europe via Cape",
+    trans_pacific: "Trans-Pacific Direct",
+    asia_us_east_panama: "Asia–US East via Panama",
   };
   return names[routeId] || routeId;
 }
@@ -81,6 +85,10 @@ function getRoutePath(routeId) {
     transshipment: "M2,12 L8,10 L14,6 L20,8 L26,10 L32,12",
     suez: "M2,12 L8,10 L14,8 L20,10 L26,12 L32,10",
     dubai: "M2,12 L8,10 L14,6 L20,8 L26,10 L32,12",
+    asia_europe_suez: "M2,12 L8,10 L14,8 L20,10 L26,12 L32,10",
+    asia_europe_cape: "M2,12 L8,10 L14,14 L20,12 L26,10 L32,8",
+    trans_pacific: "M2,12 L8,11 L14,10 L20,10 L26,11 L32,12",
+    asia_us_east_panama: "M2,12 L8,10 L14,6 L20,8 L26,10 L32,12",
   };
   return paths[routeId] || paths.current;
 }

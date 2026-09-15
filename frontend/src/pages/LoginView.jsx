@@ -6,7 +6,7 @@ const HIGHLIGHTS = [
   {
     icon: "◉",
     title: "Corridor risk scoring",
-    text: "Per-checkpoint delay probability across Suez, Cape and Dubai routes.",
+    text: "Per-checkpoint delay probability across the global Asia-Europe, Trans-Pacific and Panama corridors.",
   },
   {
     icon: "◔",

@@ -1,17 +1,47 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { api } from "../api.js";
 import { adaptRouteComparison } from "../utils/routeComparisonAdapter.js";
 import AlternativeRoutesCard from "../components/route-comparison/AlternativeRoutesCard.jsx";
 import TabState from "../components/TabState.jsx";
+
+const OBJECTIVES = ["fastest", "lowest_risk", "balanced"];
 
 export default function CompareRoutesView({ data }) {
   const { prediction, selectedShipment, loading, apiError, onRetry } = data;
   const ready = Boolean(prediction);
 
   const [selectedRouteId, setSelectedRouteId] = useState(null);
+  const [compareData, setCompareData] = useState(null);
+  const [cmpError, setCmpError] = useState(null);
+
+  const sid = prediction?.shipment_id;
+
+  useEffect(() => {
+    if (!sid) {
+      setCompareData(null);
+      return;
+    }
+    let alive = true;
+    api
+      .compare(sid, OBJECTIVES)
+      .then((res) => {
+        if (!alive) return;
+        setCompareData(res);
+        setCmpError(null);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setCompareData(null);
+        setCmpError(e.message || "Comparison unavailable");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [sid]);
 
   // Adapt data with fallback
   const { routes, isFallback, recommendation } = adaptRouteComparison(
-    prediction?.route_comparison
+    cmpError ? null : compareData
   );
 
   // Shipment display info
@@ -42,7 +72,7 @@ export default function CompareRoutesView({ data }) {
         <AlternativeRoutesCard
           routes={routes}
           recommendation={recommendation}
-          isFallback={isFallback}
+          isFallback={isFallback || Boolean(cmpError)}
           onSelectRoute={setSelectedRouteId}
           selectedRouteId={selectedRouteId}
         />

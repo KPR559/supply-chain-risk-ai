@@ -116,6 +116,19 @@ ROUTES: List[Route] = [
 
 DEFAULT_ROUTE = "asia_europe_suez"
 
+# Legacy IDs from the earlier single-corridor app still resolve to the nearest
+# existing global route so old callers/stored shipments keep working.
+ROUTE_ALIASES = {
+    "suez": "asia_europe_suez",
+    "cape": "asia_europe_cape",
+    "dubai": "asia_europe_suez",
+}
+
+
+def resolve_route_id(route_id: str) -> str:
+    """Map a legacy route id (suez/cape/dubai) to its canonical global route."""
+    return ROUTE_ALIASES.get(route_id, route_id)
+
 RISK_PRONE_KINDS = {"canal", "strait", "port", "sea"}
 
 

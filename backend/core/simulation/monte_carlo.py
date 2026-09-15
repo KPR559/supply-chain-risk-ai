@@ -129,6 +129,7 @@ def run_monte_carlo(
     n_sim = n_sim or get_settings().mc_simulations
     seed = seed if seed is not None else get_settings().mc_seed
     rng = np.random.default_rng(seed)
+    route_id = topology.resolve_route_id(route_id)
 
     if edge_transit_days is None:
         edge_transit_days = {f"{e.src}->{e.dst}": e.baseline_days

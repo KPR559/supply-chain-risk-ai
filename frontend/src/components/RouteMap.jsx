@@ -7,7 +7,15 @@ import { api } from "../api.js";
 import { riskColor, riskClass } from "../utils/helpers.js";
 import { loadUiPrefs } from "../prefs.js";
 
-const SHORT_NAMES = { suez: "Suez", cape: "Cape", dubai: "Dubai" };
+const SHORT_NAMES = {
+  asia_europe_suez: "Suez",
+  asia_europe_cape: "Cape",
+  trans_pacific: "Trans-Pac",
+  asia_us_east_panama: "Panama",
+  suez: "Suez",
+  cape: "Cape",
+  dubai: "Dubai",
+};
 const KIND_LABELS = {
   origin: "Origin",
   warehouse: "Hub",

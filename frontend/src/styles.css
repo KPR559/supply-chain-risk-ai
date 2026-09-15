@@ -2325,3 +2325,89 @@ details.mq .model-grid { margin-top: 12px; }
   .view-actions .btn { justify-content: center; }
   .export-menu .btn { width: 100%; }
 }
+
+/* ── Settings landing + sub-pages ── */
+.settings-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 18px;
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--sans);
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.settings-card:hover {
+  border-color: var(--border-light);
+  background: linear-gradient(180deg, var(--surface-elevated), var(--panel));
+}
+
+.settings-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.settings-card-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.back-link:hover { color: var(--accent); }
+
+.back-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.danger-panel {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+@media (max-width: 640px) {
+  .settings-landing-grid { grid-template-columns: 1fr; }
+}

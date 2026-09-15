@@ -195,11 +195,24 @@ def warehouse_tables() -> list:
     """Names of tables currently in the warehouse ([] if none built yet)."""
     if not get_settings().abs_duckdb_path.exists():
         return []
-    con = connect(read_only=True)
+    try:
+        con = connect(read_only=True)
+    except Exception:
+        # DuckDB forbids mixing read_only=True/False on the same file
+        # concurrently — fall back to a write-capable handle (reads fine on it)
+        try:
+            con = connect(read_only=False)
+        except Exception:
+            return []
     try:
         return sorted(r[0] for r in con.execute("SHOW TABLES").fetchall())
+    except Exception:
+        return []
     finally:
-        con.close()
+        try:
+            con.close()
+        except Exception:
+            pass
 
 
 def materialize_warehouse() -> Dict[str, int]:

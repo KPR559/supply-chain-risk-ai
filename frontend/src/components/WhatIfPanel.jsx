@@ -4,7 +4,7 @@ import { api } from "../api.js";
 const PRESETS = [
   { name: "Suez +30% congestion", node_id: "suez", adjustments: { congestion_mult: 1.3 } },
   { name: "Suez closed", node_id: "suez", adjustments: { close: true } },
-  { name: "Mumbai +50% congestion", node_id: "mumbai", adjustments: { congestion_mult: 1.5 } },
+  { name: "Malacca +50% congestion", node_id: "strait_of_malacca", adjustments: { congestion_mult: 1.5 } },
   { name: "Heavy weather (Suez +12h)", node_id: "suez", adjustments: { weather_shift: 12 } },
 ];
 
