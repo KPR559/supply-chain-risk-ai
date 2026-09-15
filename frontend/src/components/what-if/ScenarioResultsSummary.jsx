@@ -61,16 +61,9 @@ export default function ScenarioResultsSummary({ result, prediction }) {
     },
     {
       label: "Resilience Score",
-<<<<<<< HEAD
-      value: resilience != null ? formatResilience(resilience) : "—",
-      unit: null,
-      changeUnit: "pts",
-      change: resilienceChange,
-=======
       value: formatResilience(scenario.resilience_score),
       change: delta.resilience_change,
       unit: "pts",
->>>>>>> 25d4c34d3a17571ed7a99885ba8826702a693e2e
     },
   ];
 
@@ -88,12 +81,8 @@ export default function ScenarioResultsSummary({ result, prediction }) {
               {metric.value}
               {metric.change != null && (
                 <span className={`result-change ${metric.change > 0 ? "increase" : metric.change < 0 ? "decrease" : "neutral"}`}>
-<<<<<<< HEAD
-                  {metric.change > 0 ? "+" : ""}{metric.change.toFixed(1)} {metric.changeUnit || metric.unit || "days"}
-=======
                   {metric.change > 0 ? "+" : ""}
                   {metric.change.toFixed(1)} {metric.unit || "days"}
->>>>>>> 25d4c34d3a17571ed7a99885ba8826702a693e2e
                 </span>
               )}
             </div>
