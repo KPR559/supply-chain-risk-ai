@@ -419,11 +419,13 @@ input[type="number"] { width: 90px; }
 }
 
 /* World-map mode: transparent cy surface over the svg backdrop */
-.map-container.world {
+.map-container.world,
+.map-container.globe {
   background: linear-gradient(180deg, #0a1626 0%, #0b1524 60%, #0a1220 100%);
   border-radius: 8px;
 }
-.map-container.world .map-cv { background: transparent; }
+.map-container.world .map-cv,
+.map-container.globe .map-cv { background: transparent; }
 .map-bg {
   position: absolute;
   inset: 0;
@@ -438,6 +440,44 @@ input[type="number"] { width: 90px; }
   stroke: rgba(122, 144, 173, 0.5);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
+}
+
+/* Globe (3D orthographic) surface */
+.globe-core { stroke: none; }
+.globe-rim {
+  fill: none;
+  stroke: rgba(140, 170, 210, 0.6);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+.map-graticule {
+  fill: none;
+  stroke: rgba(120, 145, 180, 0.18);
+  stroke-width: 0.7;
+  vector-effect: non-scaling-stroke;
+}
+.globe-land {
+  fill: rgba(70, 92, 124, 0.62);
+  stroke: rgba(150, 168, 192, 0.55);
+}
+
+/* Real 3D globe (react-globe.gl): hide the cytoscape surface underneath */
+.map-cv-hidden { visibility: hidden; }
+.map-globe3d {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.map-globe3d > div { width: 100% !important; height: 100% !important; }
+.float-tooltip-kap {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font: inherit !important;
+  color: inherit !important;
 }
 
 

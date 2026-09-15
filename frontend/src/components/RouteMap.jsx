@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import cytoscape from "cytoscape";
+import Globe from "react-globe.gl";
 import { feature } from "topojson-client";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import landTopo from "world-atlas/land-110m.json";
 import { api } from "../api.js";
 import AiSection from "./llm/AiSection.jsx";
 import { riskColor, riskClass } from "../utils/helpers.js";
-import { loadUiPrefs } from "../prefs.js";
+import { loadUiPrefs, saveUiPrefs } from "../prefs.js";
 
 const SHORT_NAMES = {
   asia_europe_suez: "Suez",
@@ -75,6 +76,8 @@ const CY_STYLE = [
       width: 2.2,
       "line-color": "#22c55e",
       "curve-style": "bezier",
+      "control-point-distance": "data(bow)",
+      "control-point-weight": 0.5,
       "line-cap": "round",
       label: "data(label)",
       "font-size": 8.5,
@@ -103,10 +106,16 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
   const [aiNodeLoading, setAiNodeLoading] = useState(false);
   const [aiEdge, setAiEdge] = useState({ key: null, text: null });
   const [aiEdgeLoading, setAiEdgeLoading] = useState(false);
-  const [layout, setLayout] = useState(() => (loadUiPrefs().mapLayout === "graph" ? "graph" : "world")); // 'world' | 'graph'
+  const [layout, setLayout] = useState(() => {
+    const saved = loadUiPrefs().mapLayout;
+    return saved === "graph" || saved === "world" ? saved : "globe";
+  }); // 'globe' | 'world' | 'graph'
   const [view, setView] = useState({ x: 0, y: 0, z: 1 }); // shared cy pan/zoom for the bg layer
   const wrapRef = useRef(null);
   const cyRef = useRef(null);
+  const globeRef = useRef(null);
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 460 });
 
   // Continent silhouettes (world-atlas land-110m + topojson-client),
   // projected once through the same corridor projection as the nodes.
@@ -132,31 +141,35 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
     }
   }, []);
 
+  // GeoJSON land features for react-globe.gl polygons layer
+  const landPolygons = useMemo(() => {
+    try {
+      return (feature(landTopo, landTopo.objects.land).features || []);
+    } catch { return []; }
+  }, []);
 
-  const sizeRef = useRef({ width: 800, height: 460 });
+const sizeRef = useRef({ width: 800, height: 460 });
+  const graphsLoadRef = useRef(null);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
+    // One in-flight graphs fetch shared across re-mounts/StrictMode double-invoke;
+    // setRoutes is safe to call after cleanup (React treats it as a no-op).
+    if (graphsLoadRef.current) return;
+    graphsLoadRef.current = (async () => {
       try {
         const g = await api.graphs();
-        if (!alive) return;
         setRoutes(g.routes || []);
         setVisible(Object.fromEntries((g.routes || []).map((r) => [r.route_id, true])));
       } catch (e) {
         try {
           const list = await Promise.all(["suez", "cape", "dubai"].map((rid) => api.graph(rid)));
-          if (!alive) return;
           setRoutes(list);
           setVisible(Object.fromEntries(list.map((r) => [r.route_id, true])));
         } catch (e2) {
-          if (alive) setFailed(true);
+          setFailed(true);
         }
       }
     })();
-    return () => {
-      alive = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -246,6 +259,8 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
           lat: n.lat,
           px: null,
           py: null,
+          gx: 0,
+          gy: 0,
           hasPos: Boolean(n.pos && typeof n.pos.x === "number" && typeof n.pos.y === "number"),
           posx: n.pos?.x,
           posy: n.pos?.y,
@@ -257,8 +272,8 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
       }
     }
     const flat = Object.values(m);
-    if (layout === "world") {
-      // Equirectangular lon/lat → VIEW space, fixed corridor crop.
+    if (layout === "world" || layout === "globe") {
+      // Equirectangular lon/lat → VIEW space (world uses px/py; globe uses lat/lon directly).
       for (const n of flat) {
         n.px = wx(n.lon);
         n.py = wy(n.lat);
@@ -317,20 +332,21 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
     cy.startBatch();
     cy.elements().remove();
     for (const [nid, n] of Object.entries(merged)) {
+      const p = { x: n.px, y: n.py };
       if (n.prob >= 0.6) {
         cy.add({
           group: "nodes",
-          data: { id: `halo-${nid}` },
+          data: { id: `halo-${nid}`, nid },
           classes: `halo risk-${riskClass(n.prob)}`,
-          position: { x: n.px, y: n.py },
+          position: p,
         });
       }
       const label = n.label + (n.prob >= 0.3 ? `\n${Math.round(n.prob * 100)}%` : "");
       cy.add({
         group: "nodes",
-        data: { id: nid, label },
+        data: { id: nid, nid, label },
         classes: `risk-${riskClass(n.prob)} kind-${n.kind}`,
-        position: { x: n.px, y: n.py },
+        position: p,
       });
     }
     for (const route of routes) {
@@ -352,6 +368,7 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
             baseline_days: e.baseline_days,
             srcLabel: a.label || e.src,
             dstLabel: b.label || e.dst,
+            bow: 0,
             label: isActive ? `~${e.baseline_days}d` : "",
           },
           classes: `mode-${e.mode} risk-${riskClass(midProb)} ${isActive ? "route-active" : "route-alt"}`,
@@ -366,6 +383,14 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
   }, [routes, visible, activeRouteId, merged, layout]);
 
   const toggle = (rid) => setVisible((v) => ({ ...v, [rid]: !v[rid] }));
+  const chooseLayout = (next) => {
+    setLayout(next);
+    try {
+      saveUiPrefs({ ...loadUiPrefs(), mapLayout: next === "graph" ? "graph" : next });
+    } catch {
+      // ignore
+    }
+  };
 
   const zoomBy = (factor) => {
     const cy = cyRef.current;
@@ -436,6 +461,123 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
     };
   }, [selEdge, prediction, aiAvailable]);
 
+  // ── react-globe.gl data (real 3D globe) ──
+  const globePoints = useMemo(() => {
+    return Object.values(merged)
+      .filter((n) => n.lat != null && n.lon != null)
+      .map((n) => ({
+        node_id: n.node_id,
+        label: n.label,
+        kind: n.kind,
+        lat: n.lat,
+        lng: n.lon,
+        prob: n.prob,
+        expectedH: n.expectedH,
+        color: riskColor(n.prob),
+      }));
+  }, [merged]);
+
+  const globeArcs = useMemo(() => {
+    const out = [];
+    for (const route of routes) {
+      if (!visible[route.route_id]) continue;
+      const isActive = route.route_id === activeRouteId;
+      for (const e of route.edges) {
+        const a = merged[e.src];
+        const b = merged[e.dst];
+        if (!a || !b || a.lat == null || b.lat == null) continue;
+        const midProb = (a.prob + b.prob) / 2;
+        const isSea = e.mode === "sea";
+        out.push({
+          startLat: a.lat,
+          startLng: a.lon,
+          endLat: b.lat,
+          endLng: b.lon,
+          color: isActive ? riskColor(midProb) : "rgba(61,77,109,0.55)",
+          stroke: isActive ? 1.5 : 0.8,
+          altitudeAutoScale: isActive ? 0.4 : 0.25,
+          dashLength: isActive ? (isSea ? 0.5 : 0.92) : 1,
+          dashGap: isActive ? (isSea ? 0.25 : 0.08) : 0,
+          dashAnimateTime: isActive ? (isSea ? 4000 : 6000) : 0,
+          route_id: route.route_id,
+          src: e.src,
+          dst: e.dst,
+          mode: e.mode,
+          distance_km: e.distance_km,
+          baseline_days: e.baseline_days,
+          srcLabel: a.label || e.src,
+          dstLabel: b.label || e.dst,
+          isActive,
+        });
+      }
+    }
+    return out;
+  }, [routes, visible, activeRouteId, merged]);
+
+  const globeLabels = useMemo(() => {
+    return Object.values(merged)
+      .filter((n) => n.lat != null && n.lon != null)
+      .map((n) => ({
+        lat: n.lat,
+        lng: n.lon,
+        text: n.label,
+        color: riskColor(n.prob),
+      }));
+  }, [merged]);
+
+  // Keep the react-globe.gl canvas sized to its container (responsive).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        setContainerSize({ width: Math.round(r.width), height: Math.round(r.height) });
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // Enable gentle idle auto-rotation on the OrbitControls and frame the corridor.
+  const onGlobeReady = useCallback(() => {
+    const g = globeRef.current;
+    if (!g) return;
+    g.pointOfView({ lat: 18, lng: 55, altitude: 2.2 });
+    try {
+      const controls = g.controls();
+      if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.4;
+      }
+    } catch {
+      // controls unavailable — user can still drag to rotate
+    }
+  }, []);
+
+  const onGlobePointClick = useCallback((point) => {
+    setSelEdge(null);
+    setSelected((prev) => (prev === point.node_id ? null : point.node_id));
+  }, []);
+
+  const onGlobeArcClick = useCallback((arc) => {
+    setSelected(null);
+    setSelEdge({
+      key: `${arc.route_id}:${arc.src}>${arc.dst}`,
+      from: arc.srcLabel,
+      to: arc.dstLabel,
+      mode: arc.mode,
+      distance_km: arc.distance_km,
+      baseline_days: arc.baseline_days,
+    });
+  }, []);
+
+  const onGlobeClick = useCallback(() => {
+    setSelected(null);
+    setSelEdge(null);
+  }, []);
+
   return (
     <div>
       <div className="route-toggles">
@@ -459,12 +601,13 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
           );
         })}
         <span className="seg" role="group" aria-label="Map layout">
-          <button className={`seg-btn ${layout === "world" ? "on" : ""}`} onClick={() => setLayout("world")} title="Geographic world map (lon/lat projection)">World</button>
-          <button className={`seg-btn ${layout === "graph" ? "on" : ""}`} onClick={() => setLayout("graph")} title="Graph schematic layout">Graph</button>
+          <button className={`seg-btn ${layout === "globe" ? "on" : ""}`} onClick={() => chooseLayout("globe")} title="Real 3D globe (drag to rotate, scroll to zoom)">Globe</button>
+          <button className={`seg-btn ${layout === "world" ? "on" : ""}`} onClick={() => chooseLayout("world")} title="Flat world map (lon/lat projection)">World</button>
+          <button className={`seg-btn ${layout === "graph" ? "on" : ""}`} onClick={() => chooseLayout("graph")} title="Graph schematic layout">Graph</button>
         </span>
       </div>
 
-      <div className={`map-container ${layout === "world" ? "world" : ""}`}>
+      <div className={`map-container ${layout}`} ref={containerRef}>
         {layout === "world" && (
           <svg className="map-bg" aria-hidden="true">
             <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
@@ -472,18 +615,80 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
             </g>
           </svg>
         )}
-        <div className="map-cv" ref={wrapRef} />
-        <div className="map-ctl" role="group" aria-label="Map controls">
-          <button className="icon-btn" onClick={() => zoomBy(1.25)} title="Zoom in" aria-label="Zoom in">
-            <Plus size={15} aria-hidden="true" />
-          </button>
-          <button className="icon-btn" onClick={() => zoomBy(0.8)} title="Zoom out" aria-label="Zoom out">
-            <Minus size={15} aria-hidden="true" />
-          </button>
-          <button className="icon-btn" onClick={fitView} title="Fit route in view" aria-label="Fit route in view">
-            <Maximize2 size={14} aria-hidden="true" />
-          </button>
-        </div>
+        {layout === "globe" && (
+          <div className="map-globe3d">
+            <Globe
+              ref={globeRef}
+              width={containerSize.width}
+              height={containerSize.height}
+              backgroundColor="rgba(0,0,0,0)"
+            globeImageUrl="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%231a2e4f'/%3E%3C/svg%3E"
+            showGraticules
+            showAtmosphere
+            atmosphereColor="#4f9df9"
+            atmosphereAltitude={0.18}
+            onGlobeReady={onGlobeReady}
+            polygonsData={landPolygons}
+            polygonCapColor={() => "#1a2e4f"}
+            polygonSideColor={() => "rgba(40, 80, 140, 0.35)"}
+            polygonStrokeColor={() => "rgba(120, 160, 220, 0.25)"}
+            polygonAltitude={0.004}
+            polygonsTransitionDuration={400}
+            pointsData={globePoints}
+            pointLat="lat"
+            pointLng="lng"
+            pointColor="color"
+            pointAltitude={0.02}
+            pointRadius={(d) => (d.prob >= 0.6 ? 0.5 : d.prob >= 0.35 ? 0.36 : 0.26)}
+            pointResolution={12}
+            pointLabel={(d) =>
+              `<div style="background:#0a1020;border:1px solid #1e2d4a;border-radius:8px;padding:8px 10px;font-size:11px;color:#cbd5e1;font-family:Inter,system-ui,sans-serif;min-width:120px;line-height:1.4;">
+                <div style="font-weight:600;margin-bottom:3px;color:#f1f5f9;">${d.label}</div>
+                <div style="color:#94a3b8;">${KIND_LABELS[d.kind] || d.kind} · <span style="color:${d.color};">${Math.round(d.prob * 100)}% risk</span></div>
+                ${d.expectedH != null ? `<div style="color:#94a3b8;margin-top:1px;">Expected +${d.expectedH}h delay</div>` : ""}
+              </div>`
+            }
+            onPointClick={onGlobePointClick}
+            arcsData={globeArcs}
+            arcStartLat="startLat"
+            arcStartLng="startLng"
+            arcEndLat="endLat"
+            arcEndLng="endLng"
+            arcColor="color"
+            arcStroke="stroke"
+            arcAltitudeAutoScale="altitudeAutoScale"
+            arcCurveResolution={72}
+            arcDashLength="dashLength"
+            arcDashGap="dashGap"
+            arcDashAnimateTime="dashAnimateTime"
+            onArcClick={onGlobeArcClick}
+            labelsData={globeLabels}
+            labelLat="lat"
+            labelLng="lng"
+            labelText="text"
+            labelColor="color"
+            labelSize={1.2}
+            labelAltitude={0.032}
+            labelResolution={2}
+            labelIncludeDot={false}
+            onGlobeClick={onGlobeClick}
+          />
+          </div>
+        )}
+        <div className={`map-cv ${layout === "globe" ? "map-cv-hidden" : ""}`} ref={wrapRef} />
+        {layout !== "globe" && (
+          <div className="map-ctl" role="group" aria-label="Map controls">
+            <button className="icon-btn" onClick={() => zoomBy(1.25)} title="Zoom in" aria-label="Zoom in">
+              <Plus size={15} aria-hidden="true" />
+            </button>
+            <button className="icon-btn" onClick={() => zoomBy(0.8)} title="Zoom out" aria-label="Zoom out">
+              <Minus size={15} aria-hidden="true" />
+            </button>
+            <button className="icon-btn" onClick={fitView} title="Fit route in view" aria-label="Fit route in view">
+              <Maximize2 size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         {!routes.length && (
           <div className="map-status">
             {failed ? "Route map unavailable — the map request failed." : "Loading route map…"}
@@ -537,7 +742,7 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
         <span className="legend-mode solid">road</span>
         <span className="legend-mode dashed">sea</span>
         <span className="legend-mode dotted">port</span>
-        <span className="legend-hint">layout: {layout === "world" ? "World map (lon/lat) ↗ Cytoscape.js" : "Graph ↗ Cytoscape.js"} · scroll to zoom · click a node to inspect</span>
+        <span className="legend-hint">layout: {layout === "globe" ? "interactive 3D globe · drag to rotate, scroll to zoom" : layout === "world" ? "World map (lon/lat)" : "Graph"} · click a node or segment to inspect</span>
       </div>
 
       {selected && merged[selected] && (

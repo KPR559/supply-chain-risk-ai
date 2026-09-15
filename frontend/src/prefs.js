@@ -42,7 +42,7 @@ const UI_KEY = "scm.ui.v1";
 
 export const DEFAULT_UI = {
   density: "comfortable", // comfortable | compact
-  mapLayout: "world", // world | graph
+  mapLayout: "globe", // globe | world | graph
   toasts: true,
 };
 
@@ -54,7 +54,11 @@ export function loadUiPrefs() {
     return {
       density: p.density === "compact" ? "compact" : "comfortable",
       // "network" is the pre-rename stored value for the graph layout.
-      mapLayout: p.mapLayout === "graph" || p.mapLayout === "network" ? "graph" : "world",
+      mapLayout: p.mapLayout === "graph" || p.mapLayout === "network"
+        ? "graph"
+        : p.mapLayout === "world"
+          ? "world"
+          : "globe",
       toasts: p.toasts !== false,
     };
   } catch {
@@ -65,7 +69,11 @@ export function loadUiPrefs() {
 export function saveUiPrefs(prefs) {
   const clean = {
     density: prefs.density === "compact" ? "compact" : "comfortable",
-    mapLayout: prefs.mapLayout === "graph" ? "graph" : "world",
+    mapLayout: prefs.mapLayout === "graph"
+      ? "graph"
+      : prefs.mapLayout === "world"
+        ? "world"
+        : "globe",
     toasts: prefs.toasts !== false,
   };
   try {
