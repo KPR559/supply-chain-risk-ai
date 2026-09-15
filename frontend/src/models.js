@@ -234,7 +234,103 @@ export function riskHeadline({ prediction, explanation, critical }) {
   }
   return `${band.label} risk based on current route conditions.`;
 }
-
+// Exact per-feature display names. Checked FIRST in describeFactor, so each
+// model feature gets its own label + meaning instead of a group bucket.
+// (Covers all 84 trained features: 73 numeric + 11 one-hot flags.)
+const FACTOR_DETAILS = {
+  // ---- historical delay: what past delays say about this leg ----
+  delay_lag_1: { label: "Yesterday's delay", hint: "Delay recorded at this checkpoint yesterday — delays persist day to day." },
+  delay_lag_3: { label: "Delay 3 days ago", hint: "Delay recorded at this checkpoint 3 days ago." },
+  delay_lag_7: { label: "Delay a week ago", hint: "Delay recorded at this checkpoint 7 days ago — weekly persistence." },
+  delay_lag_14: { label: "Delay 2 weeks ago", hint: "Delay recorded at this checkpoint 14 days ago." },
+  delay_ewma: { label: "Delay trend (2-week average)", hint: "Exponentially weighted average of recent delays — rising means conditions are deteriorating." },
+  delay_roll_mean_7d: { label: "7-day average delay", hint: "Mean delay over the trailing 7 days (past only, no leakage)." },
+  delay_roll_mean_30d: { label: "30-day average delay", hint: "Mean delay over the trailing 30 days — the leg's current norm." },
+  delay_roll_mean_90d: { label: "90-day average delay", hint: "Mean delay over the trailing quarter — structural slowness of this leg." },
+  delay_roll_mean_365d: { label: "Yearly average delay", hint: "Mean delay over the trailing year — long-run baseline for this checkpoint." },
+  delay_roll_std_7d: { label: "Delay volatility (7 days)", hint: "How erratic delays were this week — high volatility means unpredictable arrivals." },
+  delay_roll_std_30d: { label: "Delay volatility (30 days)", hint: "Month-scale spread of delays — wide spread widens the ETA range." },
+  delay_roll_std_90d: { label: "Delay volatility (quarter)", hint: "Quarter-scale spread of delays." },
+  delay_roll_std_365d: { label: "Delay volatility (year)", hint: "Year-scale spread of delays." },
+  delay_frequency_30d: { label: "How often delayed (30 days)", hint: "Share of days this leg was delayed in the last month." },
+  delay_frequency_90d: { label: "How often delayed (quarter)", hint: "Share of days this leg was delayed in the last quarter." },
+  delay_anomaly: { label: "Delay surprise score", hint: "How surprising today's delay is versus its 30-day history (rolling z-score)." },
+  baseline_90d: { label: "90-day delay baseline", hint: "Reference delay level for this checkpoint over 90 days." },
+  // ---- regime / disruption state ----
+  regime_disrupted: { label: "Active disruption regime", hint: "Anomaly detectors agree this checkpoint is currently disrupted." },
+  regime_cusum: { label: "Sudden regime shift (CUSUM)", hint: "Cumulative-sum detector flagged an abrupt level shift in delays." },
+  regime_iso: { label: "Anomalous pattern (Isolation Forest)", hint: "This checkpoint's risk profile looks unlike its normal behaviour." },
+  regime_roll_z: { label: "Delay surprise (z-score)", hint: "Today's delay measured in standard deviations above its rolling norm." },
+  regime_days_adj: { label: "Disrupted days this week", hint: "Count of disrupted days in the trailing 7 days." },
+  regime_duration_days: { label: "Days in current regime", hint: "How long the current normal/disruption/recovery state has lasted." },
+  change_point_flag: { label: "Regime change-point", hint: "A statistical change-point fired — operating conditions just shifted." },
+  // ---- congestion / port pressure ----
+  congestion_index: { label: "Port congestion now", hint: "Current congestion level at this checkpoint (0 clear → 1 gridlocked)." },
+  congestion_percentile: { label: "Congestion vs history", hint: "Where today's congestion sits against the last 120 days." },
+  congestion_trend: { label: "Congestion trend", hint: "Whether congestion has been building or easing over 2 weeks." },
+  congestion_anomaly: { label: "Congestion spike", hint: "Today's congestion minus its 90-day baseline — a spike adds dwell time." },
+  congestion_baseline: { label: "Usual congestion", hint: "90-day average congestion — the norm this reading is judged against." },
+  port_pressure_index: { label: "Port pressure index", hint: "Composite load across vessels, berths and yard at this port." },
+  activity_7d_avg: { label: "Port activity (7 days)", hint: "Average vessel/port activity this week." },
+  activity_30d_avg: { label: "Port activity (30 days)", hint: "Average vessel/port activity this month." },
+  activity_zscore: { label: "Activity anomaly", hint: "Unusual port activity versus its norm — surges strain capacity." },
+  operational_risk_score: { label: "Operational risk", hint: "Composite operational strain (activity + pressure) at this checkpoint." },
+  // ---- weather ----
+  weather_severity: { label: "Weather severity now", hint: "Current sea/weather severity at this checkpoint (0 calm → 1 severe)." },
+  weather_extreme: { label: "Extreme weather flag", hint: "Severity crossed the extreme threshold — storms-grade disruption." },
+  weather_trend: { label: "Weather trend", hint: "Whether conditions have been worsening over the past week." },
+  weather_mean_7d: { label: "Weather this week", hint: "Average severity over the trailing 7 days." },
+  wind_speed_7d_avg: { label: "Wind (7-day average)", hint: "Sustained winds slow vessels and port handling." },
+  precipitation_7d_sum: { label: "Rainfall (7-day total)", hint: "Accumulated rain — flooding and low visibility delay legs." },
+  weather_anomaly_score: { label: "Weather anomaly", hint: "How unusual current weather is for this checkpoint and date." },
+  extreme_weather_flag: { label: "Extreme weather event", hint: "A named/severe weather event is affecting this leg." },
+  // ---- customs ----
+  customs_workload: { label: "Customs workload", hint: "Pending clearance volume at this checkpoint today." },
+  customs_weekday_effect: { label: "Customs weekday effect", hint: "Weekend/Monday staffing patterns that slow clearance." },
+  customs_workload_7d: { label: "Customs backlog trend", hint: "Average workload over 7 days — a growing backlog compounds." },
+  customs_risk: { label: "Customs risk (composite)", hint: "Workload + backlog + holiday effects combined." },
+  // ---- geopolitical / events ----
+  conflict_risk_score: { label: "Conflict risk", hint: "Armed-conflict exposure near this checkpoint (ACLED-style signal)." },
+  conflict_trend: { label: "Conflict trend", hint: "Whether regional tension has been rising over 2 weeks." },
+  conflict_recency: { label: "Recent conflict activity", hint: "How recently conflict events occurred near this corridor." },
+  geopolitical_risk: { label: "Geopolitical risk", hint: "Sanctions, unrest and route-threat exposure on this leg." },
+  event_presence: { label: "Live disruption event", hint: "A documented real-world event (strike, closure, storm) is active here." },
+  event_severity: { label: "Event severity", hint: "How severe the active documented event is (0–1)." },
+  disruption_flag: { label: "Disruption declared", hint: "An active disruption has been declared at this checkpoint." },
+  major_disruption_flag: { label: "Major disruption", hint: "A severe, corridor-level disruption (e.g. canal blockage) is active." },
+  // ---- calendar / seasonality ----
+  month: { label: "Month of year", hint: "Seasonal shipping patterns tied to the calendar month." },
+  day_of_week: { label: "Day of week", hint: "Weekday/weekend operating rhythm at ports and customs." },
+  day_of_year: { label: "Day of year", hint: "Position in the annual cycle — peak vs off-peak season." },
+  week_of_year: { label: "Week of year", hint: "Week number — captures holiday and peak-season weeks." },
+  season_quarter: { label: "Season (quarter)", hint: "Which quarter — monsoon, winter-storm and peak-season effects." },
+  fourier_sin_1: { label: "Annual cycle (sine)", hint: "Yearly seasonality wave — models repeating annual delay rhythms." },
+  fourier_cos_1: { label: "Annual cycle (cosine)", hint: "Yearly seasonality wave — models repeating annual delay rhythms." },
+  fourier_sin_2: { label: "Half-year cycle (sine)", hint: "Twice-yearly rhythm such as monsoon/peak-season pairs." },
+  fourier_cos_2: { label: "Half-year cycle (cosine)", hint: "Twice-yearly rhythm such as monsoon/peak-season pairs." },
+  fourier_sin_3: { label: "Quarterly cycle (sine)", hint: "Quarterly rhythm in shipping demand and weather." },
+  fourier_cos_3: { label: "Quarterly cycle (cosine)", hint: "Quarterly rhythm in shipping demand and weather." },
+  is_holiday: { label: "Public holiday", hint: "A public holiday is reducing staffing and throughput today." },
+  days_to_holiday: { label: "Days to next holiday", hint: "Pre-holiday rush builds congestion before the break." },
+  days_since_holiday: { label: "Days since holiday", hint: "Post-holiday backlog still clearing through the system." },
+  holiday_period_flag: { label: "Holiday period", hint: "Today falls inside an extended holiday shutdown window." },
+  // ---- route / checkpoint context ----
+  latitude: { label: "Checkpoint latitude", hint: "Geographic position — lets the model learn region-specific behaviour." },
+  longitude: { label: "Checkpoint longitude", hint: "Geographic position — lets the model learn region-specific behaviour." },
+  out_degree: { label: "Onward connections", hint: "Number of downstream legs — more options means easier rerouting." },
+  in_degree: { label: "Inbound connections", hint: "Number of upstream legs feeding this checkpoint." },
+  checkpoint_type_port: { label: "Checkpoint is a seaport", hint: "Seaports face berth, yard and customs delays." },
+  checkpoint_type_sea: { label: "Open-sea leg", hint: "Open water — mainly weather and speed driven." },
+  checkpoint_type_strait: { label: "Strait transit", hint: "Narrow chokepoint — congestion and geopolitics dominate." },
+  regime_state_DISRUPTION: { label: "State: disruption", hint: "Checkpoint officially in a disruption regime." },
+  regime_state_NORMAL: { label: "State: normal", hint: "Checkpoint operating normally — pulls risk down." },
+  regime_state_RECOVERY: { label: "State: recovery", hint: "Checkpoint recovering — residual backlog still possible." },
+  regime_state_SEVERE_DISRUPTION: { label: "State: severe disruption", hint: "Checkpoint in severe disruption — strongest risk signal." },
+  season_spring: { label: "Season: spring", hint: "Spring sailing conditions on this corridor." },
+  season_summer: { label: "Season: summer", hint: "Summer conditions — monsoon exposure on some legs." },
+  season_unknown: { label: "Season: unknown", hint: "Season tag missing — neutral calendar signal." },
+  season_winter: { label: "Season: winter", hint: "Winter conditions — storm exposure on some legs." },
+};
 // Friendly display names for model feature names. Raw names are kept in
 // `title` tooltips for debugging; the UI shows `label` + `hint`.
 const FACTOR_GROUPS = [
@@ -256,6 +352,10 @@ function prettify(name) {
 /** @returns {{ label: string, hint: string, raw: string }} */
 export function describeFactor(name) {
   const raw = String(name || "unknown");
+  if (Object.hasOwn(FACTOR_DETAILS, raw)) {
+    const d = FACTOR_DETAILS[raw];
+    return { label: d.label, hint: d.hint, raw };
+  }
   const group = FACTOR_GROUPS.find((g) => g.match.test(raw));
   if (group) return { label: group.label, hint: group.hint, raw };
   return { label: prettify(raw), hint: "Model-estimated contribution to delay probability.", raw };

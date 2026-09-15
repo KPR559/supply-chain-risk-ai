@@ -4,6 +4,7 @@ import { adaptExplanation, adaptDriverTrends } from "../utils/riskDriversAdapter
 import FactorAttributionCard from "../components/risk-drivers/FactorAttributionCard.jsx";
 import DriverTrendsCard from "../components/risk-drivers/DriverTrendsCard.jsx";
 import AiSection from "../components/llm/AiSection.jsx";
+import RootCauseAnalysis from "../components/RootCauseAnalysis.jsx";
 import TabState from "../components/TabState.jsx";
 import { riskBand } from "../models.js";
 
@@ -12,6 +13,9 @@ const TREND_KEY = "logix.predrisk.v1";
 export default function RiskDriversView({ data }) {
   const { prediction, explanation, selectedShipment, loading, apiError, onRetry, health, ai, aiLoading } = data;
   const ready = Boolean(explanation);
+  const rootCauseReady = Boolean(
+    critical?.critical_nodes?.length || explanation?.top_factors?.length
+  );
 
   // Adapt data with fallbacks (memoized so downstream effects stay stable).
   const { data: adaptedExplanation, isFallback: isExplanationFallback } = useMemo(
@@ -122,6 +126,17 @@ export default function RiskDriversView({ data }) {
           />
           <AiSection title="What Changed?" text={aiTrend} loading={aiTrendLoading} />
         </>
+      )}
+
+      {rootCauseReady && (
+        <section className="panel">
+          <h2>Root Cause Composition</h2>
+          <RootCauseAnalysis
+            critical={critical}
+            explanation={explanation}
+            prediction={prediction}
+          />
+        </section>
       )}
     </div>
   );

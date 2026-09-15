@@ -18,7 +18,6 @@ import CheckpointRiskView from "./pages/CheckpointRiskView.jsx";
 import ShipmentsView from "./pages/ShipmentsView.jsx";
 import EtaDistributionView from "./pages/EtaDistributionView.jsx";
 import RiskDriversView from "./pages/RiskDriversView.jsx";
-import ChartsGraphsView from "./pages/ChartsGraphsView.jsx";
 import WhatIfView from "./pages/WhatIfView.jsx";
 import CompareRoutesView from "./pages/CompareRoutesView.jsx";
 import SettingsView from "./pages/SettingsView.jsx";
@@ -41,7 +40,6 @@ const VIEWS = {
   shipments: ShipmentsView,
   eta: EtaDistributionView,
   contributors: RiskDriversView,
-  charts: ChartsGraphsView,
   simulator: WhatIfView,
   compare: CompareRoutesView,
   settings: SettingsView,

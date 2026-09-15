@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
-  PieChart,
   Route as RouteIcon,
   Settings as SettingsIcon,
 } from "lucide-react";
