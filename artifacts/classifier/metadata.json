@@ -1,7 +1,7 @@
 {
   "model_type": "dict",
   "version": "1.1.0",
-  "trained_at": "2026-09-14T15:12:22Z",
+  "trained_at": "2026-09-15T04:26:38Z",
   "feature_names": [
     "congestion_index",
     "weather_severity",
@@ -95,10 +95,10 @@
     "f1_score": 1.0,
     "roc_auc": 1.0,
     "pr_auc": 1.0,
-    "log_loss": 1.1920930376163597e-07,
+    "log_loss": 1.1920929665620922e-07,
     "brier_score": 0.0,
     "calibration_error": 0.0,
-    "threshold_opt": 0.7189247608184814
+    "threshold_opt": 0.7246982455253601
   },
   "extra": {
     "model_family": "xgboost",

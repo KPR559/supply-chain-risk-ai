@@ -1,7 +1,7 @@
 {
   "model_type": "dict",
   "version": "1.1.0",
-  "trained_at": "2026-09-14T15:12:22Z",
+  "trained_at": "2026-09-15T04:26:38Z",
   "feature_names": [
     "congestion_index",
     "weather_severity",
@@ -89,18 +89,18 @@
     "checkpoint_type_strait"
   ],
   "metrics": {
-    "p50_pinball_loss": 3.1568460718051106,
-    "p50_coverage": 0.4749218261413383,
-    "p50_calibration_error": 0.02507817385866168,
-    "p80_pinball_loss": 0.11344273661230024,
-    "p80_coverage": 0.867667292057536,
-    "p80_calibration_error": 0.06766729205753597,
-    "p90_pinball_loss": 0.06544288734089314,
-    "p90_coverage": 0.9317073170731708,
-    "p90_calibration_error": 0.03170731707317076,
-    "p95_pinball_loss": 0.04123397372338931,
-    "p95_coverage": 0.983739837398374,
-    "p95_calibration_error": 0.03373983739837405
+    "p50_pinball_loss": 3.1565771380179686,
+    "p50_coverage": 0.47504690431519697,
+    "p50_calibration_error": 0.02495309568480303,
+    "p80_pinball_loss": 0.11057245594998705,
+    "p80_coverage": 0.8380237648530331,
+    "p80_calibration_error": 0.03802376485303305,
+    "p90_pinball_loss": 0.06585349489541334,
+    "p90_coverage": 0.958974358974359,
+    "p90_calibration_error": 0.05897435897435899,
+    "p95_pinball_loss": 0.05162346727470771,
+    "p95_coverage": 0.98411507191995,
+    "p95_calibration_error": 0.03411507191995
   },
   "extra": {
     "quantiles": [

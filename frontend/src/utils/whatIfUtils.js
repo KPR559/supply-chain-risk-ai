@@ -330,7 +330,7 @@ export function generateEtaComparisonData(baseline, scenario) {
 /**
  * Format scenario history entry
  */
-export function formatHistoryEntry(scenarioResult, preset) {
+export function formatHistoryEntry(scenarioResult, preset, adjustments) {
   return {
     id: Date.now().toString(),
     name: preset?.name || "Custom Scenario",
@@ -338,6 +338,8 @@ export function formatHistoryEntry(scenarioResult, preset) {
     time: new Date().toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }),
     p90Eta: scenarioResult?.monte_carlo?.percentiles?.p90 || scenarioResult?.percentiles?.p90,
     delayRisk: scenarioResult?.p_miss_deadline || scenarioResult?.monte_carlo?.p_miss_deadline,
+    congestion_mult: adjustments?.congestion_mult ?? preset?.adjustments?.congestion_mult ?? 1.0,
+    weather_shift: adjustments?.weather_shift ?? preset?.adjustments?.weather_shift ?? 0,
     timestamp: Date.now(),
   };
 }

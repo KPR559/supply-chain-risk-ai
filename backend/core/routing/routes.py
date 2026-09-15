@@ -75,6 +75,18 @@ def apply_scenario_to_quantiles(base_quantiles: Dict[str, Dict[str, float]],
     return out
 
 
+def _resilience_score(delay_prob: float, uncertainty_days: float,
+                      baseline_days: float) -> float:
+    """0-100 composite of on-time reliability under delay risk.
+
+    Same formulation as the route-comparison API: penalised by the mean
+    node delay probability and by how wide the arrival tail is relative to
+    the planned transit time. Higher is better.
+    """
+    unc = min(1.0, uncertainty_days / max(baseline_days, 0.5))
+    return round(100.0 * (1.0 - delay_prob) * (1.0 - 0.5 * unc), 1)
+
+
 def run_scenario(base_quantiles: Dict[str, Dict[str, float]],
                  base_risk: Dict[str, float],
                  scenario: Scenario,
@@ -82,12 +94,35 @@ def run_scenario(base_quantiles: Dict[str, Dict[str, float]],
                  seed: Optional[int] = None) -> Dict:
     """Run the Monte Carlo engine under a scenario and return full results."""
     quantiles = apply_scenario_to_quantiles(base_quantiles, base_risk, scenario)
+    route = topology.route_by_id(scenario.route_id)
+    # Counterfactual baseline: same route, same seed, unadjusted quantiles,
+    # so the scenario delta is measured against the identical simulation draw.
+    base_mc = run_monte_carlo(
+        scenario.route_id, base_quantiles,
+        n_sim=n_sim, seed=seed,
+        attenuation=1.0,
+        deadline_days=scenario.deadline_days,
+    )
     res = run_monte_carlo(
         scenario.route_id, quantiles,
         n_sim=n_sim, seed=seed,
         attenuation=1.0,
         deadline_days=scenario.deadline_days,
     )
+    base_days = topology.route_baseline_days(route)
+    base_res = _resilience_score(
+        _mean_delay_probability(route, base_quantiles),
+        base_mc.percentiles["p90"] - base_mc.percentiles["p10"],
+        base_days,
+    )
+    scen_res = _resilience_score(
+        _mean_delay_probability(route, quantiles),
+        res.percentiles["p90"] - res.percentiles["p10"],
+        base_days,
+    )
+    mc_dict = res.to_dict()
+    mc_dict["resilience_score"] = scen_res
+    mc_dict["delta_resilience"] = round(scen_res - base_res, 1)
     # compute per-node risk under scenario (rough, from adjusted expected delay)
     per_node = {}
     for nid, q in quantiles.items():
@@ -101,7 +136,7 @@ def run_scenario(base_quantiles: Dict[str, Dict[str, float]],
         }
     return {
         "scenario": scenario.name,
-        "monte_carlo": res.to_dict(),
+        "monte_carlo": mc_dict,
         "per_node_risk": per_node,
     }
 

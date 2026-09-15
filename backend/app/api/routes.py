@@ -432,6 +432,12 @@ def whatif(req: WhatIfRequest) -> Dict[str, Any]:
     scenario_payload = {"name": req.name}
     adj = req.adjustments or ScenarioAdjustment()
     if req.node_id:
+        valid_nodes = {n["node_id"] for n in shipment["node_predictions"]}
+        if req.node_id not in valid_nodes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Checkpoint '{req.node_id}' is not on this shipment's route",
+            )
         scenario_payload["node_id"] = req.node_id
         d = adj.model_dump()
         scenario_payload.update({k: v for k, v in d.items() if v is not None})

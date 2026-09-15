@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { api } from "../api.js";
-<<<<<<< HEAD
 import { SCENARIO_PRESETS, getPresetById } from "../data/whatIfPresets.js";
 import { getCheckpointImpacts, formatHistoryEntry } from "../utils/whatIfUtils.js";
 import ScenarioInputPanel from "./what-if/ScenarioInputPanel.jsx";
@@ -11,15 +10,6 @@ import CheckpointImpactTable from "./what-if/CheckpointImpactTable.jsx";
 import ScenarioImpactExplanation from "./what-if/ScenarioImpactExplanation.jsx";
 import RecommendedActions from "./what-if/RecommendedActions.jsx";
 import ScenarioHistory from "./what-if/ScenarioHistory.jsx";
-=======
-
-const PRESETS = [
-  { name: "Suez +30% congestion", node_id: "suez", adjustments: { congestion_mult: 1.3 } },
-  { name: "Suez closed", node_id: "suez", adjustments: { close: true } },
-  { name: "Malacca +50% congestion", node_id: "strait_of_malacca", adjustments: { congestion_mult: 1.5 } },
-  { name: "Heavy weather (Suez +12h)", node_id: "suez", adjustments: { weather_shift: 12 } },
-];
->>>>>>> 79d87700fa59a36f61cef2bbd0bcd4798c0c68aa
 
 export default function WhatIfPanel({ prediction }) {
   const [selectedPresetId, setSelectedPresetId] = useState("baseline");
@@ -31,6 +21,7 @@ export default function WhatIfPanel({ prediction }) {
   const [error, setError] = useState(null);
   const [checkpointImpacts, setCheckpointImpacts] = useState([]);
   const [history, setHistory] = useState([]);
+  const [customNodeId, setCustomNodeId] = useState("suez");
 
   if (!prediction) {
     return <div className="placeholder">Run a prediction first.</div>;
@@ -49,6 +40,14 @@ export default function WhatIfPanel({ prediction }) {
       console.warn("Failed to load what-if history:", e);
     }
   }, []);
+
+  // Keep the custom node valid for the active route
+  useEffect(() => {
+    const nodes = prediction?.node_predictions || [];
+    if (nodes.length && !nodes.some((n) => n.node_id === customNodeId)) {
+      setCustomNodeId(nodes[0].node_id);
+    }
+  }, [prediction, customNodeId]);
 
   // Get selected preset object
   const selectedPreset = getPresetById(selectedPresetId);
@@ -79,7 +78,7 @@ export default function WhatIfPanel({ prediction }) {
 
         // Add to history
         const preset = getPresetById(selectedPresetId);
-        const historyEntry = formatHistoryEntry(res, preset);
+        const historyEntry = formatHistoryEntry(res, preset, adjustments);
         const STORAGE_KEY = "logix.whatif.history.v1";
         const MAX_HISTORY = 5;
         try {
@@ -108,7 +107,7 @@ export default function WhatIfPanel({ prediction }) {
 
   const handleRunCustom = () => {
     const preset = getPresetById(selectedPresetId);
-    const nodeId = preset?.node_id || "suez";
+    const nodeId = customNodeId || preset?.node_id || "suez";
     runScenario("Custom scenario", nodeId, {
       congestion_mult: Number(congestion),
       weather_shift: Number(weather),
@@ -156,6 +155,8 @@ export default function WhatIfPanel({ prediction }) {
         weather={weather}
         setWeather={setWeather}
         presetResult={result}
+        customNodeId={customNodeId}
+        onCustomNodeChange={setCustomNodeId}
       />
 
       {/* How to Use */}

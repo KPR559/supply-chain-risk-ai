@@ -18,6 +18,7 @@ import CheckpointRiskView from "./pages/CheckpointRiskView.jsx";
 import ShipmentsView from "./pages/ShipmentsView.jsx";
 import EtaDistributionView from "./pages/EtaDistributionView.jsx";
 import RiskDriversView from "./pages/RiskDriversView.jsx";
+import ChartsGraphsView from "./pages/ChartsGraphsView.jsx";
 import WhatIfView from "./pages/WhatIfView.jsx";
 import CompareRoutesView from "./pages/CompareRoutesView.jsx";
 import SettingsView from "./pages/SettingsView.jsx";
@@ -25,6 +26,7 @@ import SystemSettingsView from "./pages/SystemSettingsView.jsx";
 import AccountSettingsView from "./pages/AccountSettingsView.jsx";
 import Toast from "./components/Toast.jsx";
 import { loadUiPrefs } from "./prefs.js";
+import { riskBand } from "./models.js";
 
 
 const DEFAULT_ROUTE = "asia_europe_suez";
@@ -37,6 +39,7 @@ const VIEWS = {
   shipments: ShipmentsView,
   eta: EtaDistributionView,
   contributors: RiskDriversView,
+  charts: ChartsGraphsView,
   simulator: WhatIfView,
   compare: CompareRoutesView,
   settings: SettingsView,
@@ -56,6 +59,8 @@ export default function App() {
   const [prediction, setPrediction] = useState(null);
   const [explanation, setExplanation] = useState(null);
   const [critical, setCritical] = useState(null);
+  const [shipmentStatus, setShipmentStatus] = useState({});
+  const shipmentSnapRef = React.useRef({});
   const [health, setHealth] = useState(null);
   const [dq, setDq] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +100,41 @@ export default function App() {
       console.warn("routes meta unavailable", e);
     }
   }, []);
+
+  // Lightweight per-shipment snapshots for the registry table: predicts every
+  // non-selected shipment at low n_sim so the Shipments view shows a real
+  // route-level risk band and status per row — never a fabricated value.
+  const warmShipmentSnapshots = useCallback(async (list, skipId) => {
+    for (const s of list) {
+      if (s.id === skipId || shipmentSnapRef.current[s.id]) continue;
+      try {
+        const pred = await api.predict(s.routeId, {
+          nSim: 1000,
+          deadlineDate: s.requiredDate || null,
+        });
+        const nodes = pred?.node_predictions || [];
+        const b = riskBand(nodes, pred?.monte_carlo);
+        const snap = {
+          status: b.band === "high" || b.band === "critical" ? "At risk"
+            : b.band === "medium" ? "Heavy traffic" : "In Transit",
+          score: b.score,
+          band: b.band,
+          label: b.label,
+        };
+        shipmentSnapRef.current[s.id] = snap;
+        setShipmentStatus((prev) => ({ ...prev, [s.id]: snap }));
+      } catch {
+        // Session may be transient — the row honestly stays "Not available".
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user || !shipments.length) return;
+    const waiting = shipments.filter((s) => !shipmentSnapRef.current[s.id]);
+    warmShipmentSnapshots(waiting, selectedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, shipments, selectedId, warmShipmentSnapshots]);
 
   const loadBase = useCallback(
     async (routeId, simCount = nSim, deadlineDate = null) => {
@@ -363,6 +403,7 @@ export default function App() {
     onAddShipment: addShipment,
     onEditShipment: updateShipment,
     onDeleteShipment: deleteShipment,
+    shipmentStatus,
   };
 
   if (!user) {

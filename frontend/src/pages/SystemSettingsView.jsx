@@ -130,23 +130,7 @@ export default function SystemSettingsView({ data }) {
         </div>
       </section>
 
-      <section className="panel">
-        <h2>About LOGIX</h2>
-        <div className="metric-strip">
-          <div className="metric-cell">
-            <div className="metric-label">Product</div>
-            <div className="metric-value">AI Supply Chain Suite</div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">Version</div>
-            <div className="metric-value">1.0.0</div>
-          </div>
-          <div className="metric-cell">
-            <div className="metric-label">Build</div>
-            <div className="metric-value">Demo &middot; TECHNOVA 2026</div>
-          </div>
-        </div>
-      </section>
+      
     </div>
   );
 }

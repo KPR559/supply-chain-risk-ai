@@ -65,6 +65,7 @@ export default function ShipmentsView({ data }) {
     lastUpdated,
     onNavigate,
     notify,
+    shipmentStatus,
   } = data;
 
   const [addOpen, setAddOpen] = useState(false);
@@ -255,7 +256,9 @@ export default function ShipmentsView({ data }) {
                       </span>
                     </td>
                     <td>
-                      <span className={`risk-pill ${statusClass(s.status)}`}>{s.status}</span>
+                      <span className={`risk-pill ${statusClass(shipmentStatus?.[s.id]?.status || s.status)}`}>
+                        {shipmentStatus?.[s.id]?.status || s.status}
+                      </span>
                     </td>
                     <td>{s.location || "Not tracked"}</td>
                     <td className="table-actions">
@@ -294,6 +297,7 @@ export default function ShipmentsView({ data }) {
             prediction={prediction}
             routesMeta={routesMeta}
             onSelect={onSelectShipment}
+            snapshots={shipmentStatus}
           />
         )}
       </section>

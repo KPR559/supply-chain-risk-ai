@@ -344,6 +344,23 @@ class PredictionEngine:
                              n_sim=n_sim, seed=seed,
                              deadline_days=deadline_days)
 
+        # Distributional confidence: how tight the arrival spread is around
+        # the expected value. 100 when the P95-P50 gap is zero; penalised as
+        # the downside tail grows relative to the expected transit time.
+        spread = mc.percentiles["p95"] - mc.percentiles["p50"]
+        confidence = 100.0 * (1.0 - spread / max(mc.expected_days, 0.5))
+        confidence = round(min(100.0, max(0.0, confidence)), 1)
+
+        # Route-level resilience (same formulation as route comparison so the
+        # baseline and what-if scenarios are directly comparable).
+        route_delay_prob = float(np.mean(
+            [delay_probs[nid] for nid in route.node_ids if nid in delay_probs]
+        )) if route.node_ids else 0.0
+        route_baseline_days = topology.route_baseline_days(route)
+        unc_days = mc.percentiles["p90"] - mc.percentiles["p10"]
+        unc_ratio = min(1.0, unc_days / max(route_baseline_days, 0.5))
+        resilience = round(100.0 * (1.0 - route_delay_prob) * (1.0 - 0.5 * unc_ratio), 1)
+
         # critical nodes from simulation contribution
         critical = _rank_critical(mc.critical_nodes, route.node_ids)
 
@@ -352,6 +369,11 @@ class PredictionEngine:
         current_label = None
         if current_checkpoint:
             current_label = topology.node_label(current_checkpoint)
+
+        mc_dict = mc.to_dict(origin_date=str(base.date()),
+                     deadline_date=deadline_date)
+        mc_dict["resilience_score"] = resilience
+        mc_dict["confidence"] = confidence
 
         return {
             "shipment_id": f"{origin}-{destination}",
@@ -364,9 +386,10 @@ class PredictionEngine:
             "node_predictions": [preds[nid] for nid in route.node_ids if preds.get(nid)],
             "delay_probabilities": delay_probs,
             "delay_quantiles": delay_quantiles,
-            "monte_carlo": mc.to_dict(origin_date=str(base.date()),
-                                      deadline_date=deadline_date),
+            "monte_carlo": mc_dict,
             "critical_nodes": critical,
+            "prediction_confidence": confidence,
+            "resilience_score": resilience,
             "model_version": (registry.load_metadata("classifier") or {}).get("version", "?"),
         }
 
@@ -444,10 +467,15 @@ class PredictionEngine:
             adjustments[nid] = {k: v for k, v in scenario.items()
                                 if k in ("congestion_mult", "weather_shift",
                                          "conflict_mult", "close")}
+        deadline_days = None
+        deadline = shipment["monte_carlo"].get("deadline_date")
+        if deadline:
+            base = pd.Timestamp(shipment["prediction_date"])
+            deadline_days = (pd.Timestamp(deadline) - base).days
         sc = Scenario(name=scenario.get("name", "Custom scenario"),
                       route_id=shipment["route_id"],
                       node_adjustments=adjustments,
-                      deadline_days=shipment["monte_carlo"].get("deadline_date"))
+                      deadline_days=deadline_days)
         quantiles = {k: {"p50": v["p50"], "p80": v["p80"], "p90": v["p90"]}
                      for k, v in shipment["delay_quantiles"].items()}
         probs = shipment["delay_probabilities"]
@@ -497,6 +525,8 @@ class PredictionEngine:
                 "delay_probability": o.delay_probability,
                 "deadline_risk": round(o.deadline_risk, 4),
                 "uncertainty_days": round(o.uncertainty, 1),
+                "resilience": round(100.0 * (1.0 - o.delay_probability)
+                                    * (1.0 - 0.5 * min(1.0, o.uncertainty / max(o.baseline_days, 0.5))), 1),
                 "scores": {obj: scores_by_objective[obj][o.route.route_id]
                            for obj in objectives},
             }

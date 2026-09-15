@@ -3,9 +3,10 @@ import { fmtPct, riskBand, statusClass } from "../models.js";
 import { routeDisplayName } from "../utils/helpers.js";
 
 // Route-level delay risk (worst checkpoint on the active prediction) per
-// shipment. Only the selected shipment has a live prediction — every other
-// row honestly reports Not available instead of a fabricated value.
-export default function DelayRiskTable({ shipments, selectedId, prediction, routesMeta, onSelect }) {
+// shipment. The selected shipment uses its live prediction; every other row
+// shows the risk band from its lightweight snapshot prediction when available
+// and otherwise honestly reports Not available instead of a fabricated value.
+export default function DelayRiskTable({ shipments, selectedId, prediction, routesMeta, onSelect, snapshots = {} }) {
   const list = shipments || [];
   if (!list.length) {
     return <p className="muted">No shipments in the registry.</p>;
@@ -30,6 +31,10 @@ export default function DelayRiskTable({ shipments, selectedId, prediction, rout
         <tbody>
           {list.map((s) => {
             const isCurrent = s.id === selectedId;
+            const snap = snapshots[s.id];
+            const rowBand = isCurrent ? band : snap?.band || null;
+            const rowScore = isCurrent ? band?.score : snap?.score;
+            const rowLabel = isCurrent ? band?.label : snap?.label;
             return (
               <tr
                 key={s.id}
@@ -40,15 +45,15 @@ export default function DelayRiskTable({ shipments, selectedId, prediction, rout
                 <td className="mono">{s.id}</td>
                 <td>{routeNames[s.routeId] || routeDisplayName(s.routeId)}</td>
                 <td>
-                  {isCurrent && band ? (
+                  {rowBand ? (
                     <span className="risk-cell">
-                      <span className={`risk-pill ${band.band === "critical" ? "high" : band.band}`}>
-                        {fmtPct(band.score / 100)} · {band.label}
+                      <span className={`risk-pill ${rowBand === "critical" ? "high" : rowBand}`}>
+                        {fmtPct(rowScore / 100)} · {rowLabel}
                       </span>
                       <span className="risk-track">
                         <span
-                          className={`risk-fill ${band.band === "critical" ? "high" : band.band}`}
-                          style={{ width: `${Math.max(2, band.score)}%` }}
+                          className={`risk-fill ${rowBand === "critical" ? "high" : rowBand}`}
+                          style={{ width: `${Math.max(2, rowScore)}%` }}
                         />
                       </span>
                     </span>
@@ -57,7 +62,9 @@ export default function DelayRiskTable({ shipments, selectedId, prediction, rout
                   )}
                 </td>
                 <td>
-                  <span className={`risk-pill ${statusClass(s.status)}`}>{s.status}</span>
+                  <span className={`risk-pill ${statusClass(snap?.status || s.status)}`}>
+                    {snap?.status || s.status}
+                  </span>
                 </td>
               </tr>
             );

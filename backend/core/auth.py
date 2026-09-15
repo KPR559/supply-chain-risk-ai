@@ -14,7 +14,7 @@ import hmac
 import secrets
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 import jwt as pyjwt
@@ -28,7 +28,8 @@ _JWT_ALG = "HS256"
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    # Naive-UTC to stay consistent with stored DuckDB timestamps.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _jwt_secret() -> str:

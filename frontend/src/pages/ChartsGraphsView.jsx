@@ -12,8 +12,8 @@ export default function ChartsGraphsView({ data }) {
     <div className="view-stack">
       <div className="view-head">
         <div>
-          <div className="view-title">Charts & Graphs</div>
-          <div className="view-sub">Delay composition: impact pathway, drivers and mode split</div>
+          <div className="view-title">Root Cause Analysis</div>
+          <div className="view-sub">Delay composition: impact pathway, drivers and critical checkpoints</div>
         </div>
       </div>
 

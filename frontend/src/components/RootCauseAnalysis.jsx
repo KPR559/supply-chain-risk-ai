@@ -1,14 +1,6 @@
 import React from "react";
 import { DONUT_COLORS } from "../utils/helpers.js";
 
-const PATHWAY = [
-  "Regional Conflict",
-  "Route Avoidance",
-  "Suez Congestion",
-  "Port Dwell Time",
-  "Customs Disruption",
-];
-
 function DonutChart({ items, totalLabel }) {
   const total = items.reduce((s, i) => s + i.value, 0) || 1;
   let offset = 0;
@@ -63,6 +55,15 @@ export default function RootCauseAnalysis({ critical, explanation, prediction })
     value: c.percent,
   }));
 
+  // Data-driven impact pathway: the critical checkpoints in route order
+  // (fall back to the top contributing factor labels if none are critical).
+  const routeNodes = prediction?.node_predictions || [];
+  const critIds = new Set(critItems.map((c) => c.node_id));
+  const orderedCrit = routeNodes.filter((n) => critIds.has(n.node_id));
+  const pathway = (orderedCrit.length ? orderedCrit : factors.slice(0, 5))
+    .slice(0, 5)
+    .map((x) => x.label || x.name);
+
   const maxFactor = Math.max(...factors.map((f) => Math.abs(f.contribution)), 0.01);
 
   return (
@@ -70,10 +71,10 @@ export default function RootCauseAnalysis({ critical, explanation, prediction })
       <div className="pathway">
         <div className="pathway-label">Primary Impact Pathway</div>
         <div className="pathway-flow">
-          {PATHWAY.map((step, i) => (
+          {pathway.map((step, i) => (
             <React.Fragment key={step}>
               <span className="pathway-node">{step}</span>
-              {i < PATHWAY.length - 1 && <span className="pathway-arrow">→</span>}
+              {i < pathway.length - 1 && <span className="pathway-arrow">→</span>}
             </React.Fragment>
           ))}
         </div>

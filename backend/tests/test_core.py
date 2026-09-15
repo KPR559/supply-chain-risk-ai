@@ -145,7 +145,7 @@ def test_quantile_trainer_converges_on_synthetic():
     assert set(result["models"]) == {"p50", "p80", "p90"}
     assert result["metrics"]["mae_test"] < 1.5
     # quantiles must be ordered per-sample after prediction
-    X = Xy[["f_congestion"]].astype(float).head(50)
+    X = Xy[["f_congestion"]].astype(float).head(50).to_numpy()
     preds = {q: m.predict(X) for q, m in result["models"].items()}
     assert np.all(preds["p50"] <= preds["p80"] + 1e-6)
     assert np.all(preds["p80"] <= preds["p90"] + 1e-6)

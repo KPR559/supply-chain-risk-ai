@@ -84,15 +84,15 @@ export default function AccountSettingsView({ data }) {
           {changeSuccess && <div className="banner success login-success">{changeSuccess}</div>}
           <label className="login-field">
             <span>Current password</span>
-            <input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" />
+            <input type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)}  />
           </label>
           <label className="login-field">
             <span>New password</span>
-            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" />
+            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)}  />
           </label>
           <label className="login-field">
             <span>Confirm new password</span>
-            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" />
+            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}  />
           </label>
           <div className="delete-confirm-actions">
             <button className="btn mini-btn" type="submit" disabled={changeBusy}>

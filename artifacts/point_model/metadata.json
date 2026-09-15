@@ -1,7 +1,7 @@
 {
   "model_type": "HistGradientBoostingRegressor",
   "version": "1.1.0",
-  "trained_at": "2026-09-14T15:12:22Z",
+  "trained_at": "2026-09-15T04:26:38Z",
   "feature_names": [
     "congestion_index",
     "weather_severity",
@@ -89,10 +89,10 @@
     "checkpoint_type_strait"
   ],
   "metrics": {
-    "mae": 0.2721144990663342,
-    "rmse": 0.9034639421917064,
-    "r2": 0.993632679434052,
-    "median_absolute_error": 0.0023278087589240215
+    "mae": 0.2705728127146084,
+    "rmse": 0.9003709178140971,
+    "r2": 0.9936762020694616,
+    "median_absolute_error": 0.002522140062779954
   },
   "extra": {}
 }

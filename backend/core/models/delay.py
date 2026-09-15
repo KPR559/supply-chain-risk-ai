@@ -61,11 +61,11 @@ def train_quantile_models(Xy: pd.DataFrame, feature_cols: list,
     tr, va, te = split_time(Xy)
     y_tr = tr[_TARGET].astype(float).values
     X_tr = tr[feature_cols].astype(float)
-    X_va = va[feature_cols].astype(float)
-    y_va = va[_TARGET].astype(float).values
-    X_te = te[feature_cols].astype(float)
-    y_te = te[_TARGET].astype(float).values
     Xn_tr = X_tr.to_numpy(dtype=np.float32)
+    Xn_va = va[feature_cols].astype(float).to_numpy(dtype=np.float32)
+    Xn_te = te[feature_cols].astype(float).to_numpy(dtype=np.float32)
+    y_va = va[_TARGET].astype(float).values
+    y_te = te[_TARGET].astype(float).values
 
     models: Dict[str, Any] = {}
     lower = None
@@ -81,8 +81,8 @@ def train_quantile_models(Xy: pd.DataFrame, feature_cols: list,
         m = MonotoneQuantile(raw, lower=lower)
         name = f"p{int(q * 100)}"
         models[name] = m
-        p_va = np.asarray(m.predict(X_va)).ravel()
-        p_te = np.asarray(m.predict(X_te)).ravel()
+        p_va = np.asarray(m.predict(Xn_va)).ravel()
+        p_te = np.asarray(m.predict(Xn_te)).ravel()
         metrics[f"mae_p{int(q*100)}_val"] = mean_absolute_error(y_va, p_va)
         metrics[f"mae_p{int(q*100)}_test"] = mean_absolute_error(y_te, p_te)
         metrics[f"rmse_p{int(q*100)}_val"] = float(np.sqrt(mean_squared_error(y_va, p_va)))
@@ -90,7 +90,7 @@ def train_quantile_models(Xy: pd.DataFrame, feature_cols: list,
         lower = models[name]
 
     # Median model MAE/RMSE as headline
-    med = np.asarray(models["p50"].predict(X_te)).ravel()
+    med = np.asarray(models["p50"].predict(Xn_te)).ravel()
     metrics["mae_test"] = mean_absolute_error(y_te, med)
     metrics["rmse_test"] = float(np.sqrt(mean_squared_error(y_te, med)))
     metrics["quantiles"] = quantiles

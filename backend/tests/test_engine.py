@@ -81,6 +81,21 @@ def test_whatif_increases_p90(engine, shipment):
     assert res["monte_carlo"]["percentiles"]["p90"] > base_p90
 
 
+def test_whatif_with_deadline_date_does_not_crash(engine):
+    # Regression: predict with a deadline materializes monte_carlo.deadline_date
+    # as a "YYYY-MM-DD" string; whatif must convert it to days, not pass it to
+    # the numpy comparison.
+    s = engine.predict_shipment(
+        "shanghai", "rotterdam", route_id="asia_europe_suez",
+        deadline_date="2026-10-05", seed=7)
+    assert s["monte_carlo"]["deadline_date"] == "2026-10-05"
+    res = engine.whatif(s, {
+        "name": "Suez blocked", "node_id": "suez", "close": True,
+    })
+    assert res["monte_carlo"]["expected_days"] > 0
+    assert "p_miss_deadline" in res["monte_carlo"]
+
+
 def test_compare_recommendations_are_valid(engine, shipment):
     cmp = engine.compare(shipment, ["fastest", "lowest_risk", "balanced"])
     assert set(cmp["recommended"]) == {"fastest", "lowest_risk", "balanced"}

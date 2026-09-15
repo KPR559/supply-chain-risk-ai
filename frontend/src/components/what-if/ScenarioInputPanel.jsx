@@ -16,6 +16,8 @@ export default function ScenarioInputPanel({
   setWeather,
   setSelectedPresetId,
   presetResult,
+  customNodeId,
+  onCustomNodeChange,
 }) {
   const [validationErrors, setValidationErrors] = useState([]);
   const [showCustomInputs, setShowCustomInputs] = useState(false);
@@ -99,16 +101,16 @@ export default function ScenarioInputPanel({
         <label className="whatif-label">
           Node / Checkpoint
           <select
-            value={selectedPreset?.node_id || ""}
+            value={isCustom ? customNodeId || "" : selectedPreset?.node_id || ""}
             onChange={(e) => {
               const nodeId = e.target.value;
-              setSelectedPresetId((prev) => {
-                const preset = getPresetById(prev);
-                return preset?.isCustom ? prev : "custom"; // Switch to custom if changing node
-              });
-              // We need a way to update node_id - for now just track via custom
+              setSelectedPresetId((prev) =>
+                getPresetById(prev)?.isCustom ? prev : "custom"
+              );
+              setShowCustomInputs(true);
+              onCustomNodeChange?.(nodeId);
             }}
-            disabled={running || isCustom}
+            disabled={running}
             className="whatif-select"
           >
             {prediction?.node_predictions?.map((n) => (
@@ -117,7 +119,7 @@ export default function ScenarioInputPanel({
           </select>
         </label>
         {isCustom && (
-          <div className="whatif-hint">Using custom node selection</div>
+          <div className="whatif-hint">Pick the checkpoint this scenario affects</div>
         )}
       </div>
 
