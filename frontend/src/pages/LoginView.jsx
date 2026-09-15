@@ -1,29 +1,7 @@
 import React, { useState } from "react";
 import { DEFAULT_CREDENTIALS } from "../auth.js";
 import { api } from "../api.js";
-
-const HIGHLIGHTS = [
-  {
-    icon: "◉",
-    title: "Corridor risk scoring",
-    text: "Per-checkpoint delay probability across Suez, Cape and Dubai routes.",
-  },
-  {
-    icon: "◔",
-    title: "Probabilistic ETA",
-    text: "10,000-run Monte Carlo arrivals with deadline-miss risk.",
-  },
-  {
-    icon: "⬡",
-    title: "What-if simulator",
-    text: "Stress-test congestion, weather and closures before they happen.",
-  },
-  {
-    icon: "◫",
-    title: "Explainable drivers",
-    text: "SHAP-style attribution shows exactly what pushes risk up.",
-  },
-];
+import loginVideo from "../video/Screen Recording 2026-09-14 at 10.32.11\u202FPM.mov";
 
 export default function LoginView({ onLogin, onRegister }) {
   const [mode, setMode] = useState("signin");
@@ -54,6 +32,15 @@ export default function LoginView({ onLogin, onRegister }) {
     setShowForgot(false);
     setForgotError(null);
     setForgotSuccess(null);
+  };
+
+  const fillDemo = () => {
+    setUsername(DEFAULT_CREDENTIALS.username);
+    setPassword(DEFAULT_CREDENTIALS.password);
+    setRemember(true);
+    setShowForgot(false);
+    setError(null);
+    setSuccess(null);
   };
 
   const handleForgotRequest = async (e) => {
@@ -107,8 +94,23 @@ export default function LoginView({ onLogin, onRegister }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    const user = username.trim();
+    if (!user) {
+      setError("Please enter your username.");
+      setSuccess(null);
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      setSuccess(null);
+      return;
+    }
     if (isSignup && password !== confirm) {
       setError("Passwords do not match.");
+      return;
+    }
+    if (isSignup && password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     setBusy(true);
@@ -116,7 +118,7 @@ export default function LoginView({ onLogin, onRegister }) {
     setSuccess(null);
     try {
       if (isSignup) {
-        const err = await onRegister(username.trim(), password);
+        const err = await onRegister(user, password);
         if (err) {
           setError(err);
         } else {
@@ -126,7 +128,7 @@ export default function LoginView({ onLogin, onRegister }) {
           setConfirm("");
         }
       } else {
-        const err = await onLogin(username.trim(), password, remember);
+        const err = await onLogin(user, password, remember);
         if (err) setError(err);
       }
     } finally {
@@ -137,6 +139,17 @@ export default function LoginView({ onLogin, onRegister }) {
   return (
     <div className="login-page">
       <aside className="login-side">
+        <video
+          className="login-video"
+          src={loginVideo}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
         <div className="login-side-inner">
           <div className="login-side-brand">
             <div className="brand-logo login-logo">∞</div>
@@ -147,27 +160,19 @@ export default function LoginView({ onLogin, onRegister }) {
           </div>
 
           <h1 className="login-hero">
-            Predictive risk &amp; decision intelligence for global supply chains
+            “See risks before they
+            <br />
+            become delays.”
           </h1>
-
-          <ul className="login-points">
-            {HIGHLIGHTS.map((h) => (
-              <li key={h.title}>
-                <span className="login-point-icon">{h.icon}</span>
-                <div>
-                  <div className="login-point-title">{h.title}</div>
-                  <div className="login-point-text">{h.text}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-
         </div>
       </aside>
 
       <main className="login-main">
-        <form className="login-card" onSubmit={submit}>
+        <form className="login-card" onSubmit={submit} noValidate>
           <div className="login-brand">LOGIX</div>
+          <p className="login-tagline-mobile">
+            “See risks before they become delays.”
+          </p>
           <h2 className="login-title">{isSignup ? "Create account" : "Sign in"}</h2>
 
           <div className="auth-tabs" role="tablist" aria-label="Sign in or create account">
@@ -191,8 +196,16 @@ export default function LoginView({ onLogin, onRegister }) {
             </button>
           </div>
 
-          {error && <div className="banner error login-error">{error}</div>}
-          {success && <div className="banner success login-success">{success}</div>}
+          {error && (
+            <div className="banner error login-error" role="alert">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="banner success login-success" role="status">
+              {success}
+            </div>
+          )}
 
           <label className="login-field">
             <span>Username</span>
@@ -202,7 +215,9 @@ export default function LoginView({ onLogin, onRegister }) {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               autoFocus
-              placeholder="admin"
+              required
+              aria-invalid={!!error}
+              placeholder="Enter your username"
             />
           </label>
 
@@ -214,12 +229,15 @@ export default function LoginView({ onLogin, onRegister }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                placeholder="••••••••"
+                required
+                aria-invalid={!!error}
+                placeholder="Enter your password"
               />
               <button
                 type="button"
                 className="password-toggle"
                 onClick={() => setShowPassword((v) => !v)}
+                aria-pressed={showPassword}
                 title={showPassword ? "Hide password" : "Show password"}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -236,7 +254,9 @@ export default function LoginView({ onLogin, onRegister }) {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
-                placeholder="••••••••"
+                required
+                aria-invalid={!!error}
+                placeholder="Confirm your password"
               />
             </label>
           )}
@@ -263,6 +283,12 @@ export default function LoginView({ onLogin, onRegister }) {
           </button>
 
           {!isSignup && !showForgot && (
+            <button type="button" className="link-btn" onClick={fillDemo}>
+              Use demo account
+            </button>
+          )}
+
+          {!isSignup && !showForgot && (
             <button type="button" className="link-btn" onClick={() => setShowForgot(true)}>
               Forgot password?
             </button>
@@ -274,8 +300,8 @@ export default function LoginView({ onLogin, onRegister }) {
               <p className="muted" style={{ fontSize: "12px" }}>
                 Enter your username to get a reset token (demo: token is shown here).
               </p>
-              {forgotError && <div className="banner error login-error">{forgotError}</div>}
-              {forgotSuccess && <div className="banner success login-success">{forgotSuccess}</div>}
+              {forgotError && <div className="banner error login-error" role="alert">{forgotError}</div>}
+              {forgotSuccess && <div className="banner success login-success" role="status">{forgotSuccess}</div>}
               {!forgotToken ? (
                 <form onSubmit={handleForgotRequest} className="forgot-form">
                   <label className="login-field">
@@ -284,7 +310,7 @@ export default function LoginView({ onLogin, onRegister }) {
                       type="text"
                       value={forgotUser}
                       onChange={(e) => setForgotUser(e.target.value)}
-                      placeholder="admin"
+                      placeholder="Enter your username"
                     />
                   </label>
                   <button className="btn" type="submit" disabled={forgotBusy}>
@@ -330,6 +356,9 @@ export default function LoginView({ onLogin, onRegister }) {
           )}
 
         </form>
+        <p className="login-foot">
+          © 2026 LOGIX · Secure Supply Chain Intelligence
+        </p>
       </main>
     </div>
   );
