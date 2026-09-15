@@ -43,6 +43,19 @@ PROFILES = {
     "mumbai":           dict(base=6.0, weather_sens=2.0, cong_sens=3.0, conflict_sens=1.2, seasonal_amp=3.0, cong_base=0.50, cong_ar=0.8,  storm_rate=5.0, noise=3.5),
     "customs":          dict(base=5.5, weather_sens=0.3,  cong_sens=2.5,  conflict_sens=0.0, seasonal_amp=2.5, cong_base=0.55, cong_ar=0.8,  storm_rate=2.0, noise=3.0),
     "final_destination":dict(base=0.5, weather_sens=0.5,  cong_sens=0.5,  conflict_sens=0.0, seasonal_amp=0.5, cong_base=0.10, cong_ar=0.5,  storm_rate=1.0, noise=1.0),
+    "shanghai":            dict(base=3.0, weather_sens=1.2, cong_sens=2.5, conflict_sens=0.2, seasonal_amp=1.5, cong_base=0.45, cong_ar=0.75, storm_rate=3.0, noise=2.5),
+    "singapore":           dict(base=2.5, weather_sens=1.0, cong_sens=2.2, conflict_sens=0.2, seasonal_amp=1.0, cong_base=0.40, cong_ar=0.75, storm_rate=2.5, noise=2.0),
+    "busan":               dict(base=2.0, weather_sens=1.2, cong_sens=1.8, conflict_sens=0.3, seasonal_amp=1.0, cong_base=0.30, cong_ar=0.7,  storm_rate=3.0, noise=2.0),
+    "rotterdam":           dict(base=2.5, weather_sens=1.5, cong_sens=2.0, conflict_sens=0.1, seasonal_amp=1.5, cong_base=0.35, cong_ar=0.7,  storm_rate=3.5, noise=2.0),
+    "los_angeles":         dict(base=3.0, weather_sens=1.0, cong_sens=2.5, conflict_sens=0.1, seasonal_amp=1.0, cong_base=0.40, cong_ar=0.75, storm_rate=2.0, noise=2.5),
+    "new_york":            dict(base=2.5, weather_sens=1.5, cong_sens=2.0, conflict_sens=0.1, seasonal_amp=1.5, cong_base=0.35, cong_ar=0.7,  storm_rate=3.0, noise=2.0),
+    "panama_canal":        dict(base=4.5, weather_sens=1.5, cong_sens=3.0, conflict_sens=0.3, seasonal_amp=1.5, cong_base=0.45, cong_ar=0.8,  storm_rate=2.5, noise=3.5),
+    "strait_of_malacca":   dict(base=1.5, weather_sens=1.5, cong_sens=1.5, conflict_sens=1.0, seasonal_amp=1.0, cong_base=0.30, cong_ar=0.7,  storm_rate=3.0, noise=1.5),
+    "strait_of_hormuz":    dict(base=1.5, weather_sens=1.0, cong_sens=1.2, conflict_sens=5.0, seasonal_amp=1.0, cong_base=0.25, cong_ar=0.7,  storm_rate=2.0, noise=1.5),
+    "bab_el_mandeb":       dict(base=2.0, weather_sens=1.5, cong_sens=1.5, conflict_sens=6.0, seasonal_amp=1.5, cong_base=0.30, cong_ar=0.75, storm_rate=2.5, noise=2.0),
+    "strait_of_gibraltar": dict(base=1.0, weather_sens=1.8, cong_sens=1.2, conflict_sens=0.5, seasonal_amp=1.0, cong_base=0.25, cong_ar=0.7,  storm_rate=3.5, noise=1.5),
+    "taiwan_strait":       dict(base=1.5, weather_sens=2.0, cong_sens=1.5, conflict_sens=2.5, seasonal_amp=1.5, cong_base=0.25, cong_ar=0.7,  storm_rate=4.0, noise=1.5),
+    "english_channel":     dict(base=1.5, weather_sens=2.0, cong_sens=1.8, conflict_sens=0.2, seasonal_amp=1.5, cong_base=0.35, cong_ar=0.7,  storm_rate=4.5, noise=1.5),
 }
 
 # Days with a yearly-period sinusoidal seasonal pattern scaled per node.

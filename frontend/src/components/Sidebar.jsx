@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
-  PieChart,
   Route as RouteIcon,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -29,7 +28,6 @@ export const NAV_ITEMS = [
   { id: "checkpoints", label: "Checkpoint Risk", icon: Diamond, section: "intelligence" },
   { id: "eta", label: "ETA Distribution", icon: BarChart3, section: "analysis" },
   { id: "contributors", label: "Risk Drivers", icon: Layers, section: "analysis" },
-  { id: "charts", label: "Root Cause", icon: PieChart, section: "analysis" },
   { id: "compare", label: "Route Comparison", icon: ArrowLeftRight, section: "analysis" },
   { id: "simulator", label: "What-if Simulator", icon: FlaskConical, section: "simulation" },
   { id: "settings", label: "Settings", icon: SettingsIcon, section: "system" },

@@ -2,11 +2,15 @@ import React from "react";
 import { adaptExplanation, adaptDriverTrends } from "../utils/riskDriversAdapter.js";
 import FactorAttributionCard from "../components/risk-drivers/FactorAttributionCard.jsx";
 import DriverTrendsCard from "../components/risk-drivers/DriverTrendsCard.jsx";
+import RootCauseAnalysis from "../components/RootCauseAnalysis.jsx";
 import TabState from "../components/TabState.jsx";
 
 export default function RiskDriversView({ data }) {
-  const { prediction, explanation, selectedShipment, loading, apiError, onRetry } = data;
+  const { prediction, explanation, critical, selectedShipment, loading, apiError, onRetry } = data;
   const ready = Boolean(explanation);
+  const rootCauseReady = Boolean(
+    critical?.critical_nodes?.length || explanation?.top_factors?.length
+  );
 
   // Adapt data with fallbacks
   const { data: adaptedExplanation, isFallback: isExplanationFallback } = adaptExplanation(
@@ -53,6 +57,17 @@ export default function RiskDriversView({ data }) {
             isFallback={isTrendsFallback}
           />
         </>
+      )}
+
+      {rootCauseReady && (
+        <section className="panel">
+          <h2>Root Cause Composition</h2>
+          <RootCauseAnalysis
+            critical={critical}
+            explanation={explanation}
+            prediction={prediction}
+          />
+        </section>
       )}
     </div>
   );
