@@ -35,7 +35,7 @@ export const NAV_ITEMS = [
 
 
 
-export default function Sidebar({ active = "results", onSelect, user, onLogout, onOpenAlerts }) {
+export default function Sidebar({ active = "results", onSelect, user, avatar, onLogout, onOpenAlerts }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
@@ -78,7 +78,13 @@ export default function Sidebar({ active = "results", onSelect, user, onLogout, 
         {user && (
           <div className="sidebar-user-row">
             <div className="sidebar-user" title={`Signed in as ${user}`}>
-              <span className="user-avatar">{user[0].toUpperCase()}</span>
+              {avatar ? (
+                <span className="user-avatar user-avatar-img">
+                  <img src={avatar} alt={user} />
+                </span>
+              ) : (
+                <span className="user-avatar">{user[0].toUpperCase()}</span>
+              )}
               <span className="user-name">{user}</span>
             </div>
             <button

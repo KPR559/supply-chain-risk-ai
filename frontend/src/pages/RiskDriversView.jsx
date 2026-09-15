@@ -11,7 +11,7 @@ import { riskBand } from "../models.js";
 const TREND_KEY = "logix.predrisk.v1";
 
 export default function RiskDriversView({ data }) {
-  const { prediction, explanation, selectedShipment, loading, apiError, onRetry, health, ai, aiLoading } = data;
+  const { prediction, explanation, critical, selectedShipment, loading, apiError, onRetry, health, ai, aiLoading } = data;
   const ready = Boolean(explanation);
   const rootCauseReady = Boolean(
     critical?.critical_nodes?.length || explanation?.top_factors?.length

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import secrets
 import time
 from collections import defaultdict
@@ -88,7 +89,8 @@ def ensure_tables() -> None:
             "CREATE TABLE IF NOT EXISTS users ("
             "username VARCHAR PRIMARY KEY, "
             "password_hash VARCHAR, "
-            "created_at TIMESTAMP)"
+            "created_at TIMESTAMP, "
+            "avatar VARCHAR)"
         )
         con.execute(
             "CREATE TABLE IF NOT EXISTS sessions ("
@@ -102,6 +104,11 @@ def ensure_tables() -> None:
             "username VARCHAR, "
             "expires_at TIMESTAMP)"
         )
+        # migrate older databases that were created without the avatar column
+        try:
+            con.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar VARCHAR")
+        except Exception:
+            pass
     finally:
         con.close()
 
@@ -129,7 +136,6 @@ def ensure_default_admin() -> str:
 
 def authenticate(username: str, password: str) -> Optional[str]:
     """Return the username when credentials are valid, else None."""
-    ensure_default_admin()
     con = storage.connect()
     try:
         row = con.execute(
@@ -385,6 +391,85 @@ def delete_user(username: str) -> bool:
         return True
     finally:
         con.close()
+
+
+# ---------------------------------------------------------------------------
+# Profile (avatar) and username changes
+# ---------------------------------------------------------------------------
+
+def get_profile(username: str) -> Optional[Dict]:
+    """Return the public profile for a user, or None if the user is unknown."""
+    ensure_tables()
+    con = storage.connect()
+    try:
+        row = con.execute(
+            "SELECT username, avatar, created_at FROM users WHERE username = ?",
+            [username],
+        ).fetchone()
+    except Exception:
+        return None
+    finally:
+        con.close()
+    if row is None:
+        return None
+    return {
+        "username": row[0],
+        "avatar": row[1],
+        "created_at": row[2].isoformat() if row[2] is not None else None,
+    }
+
+
+def update_profile(username: str, avatar: Optional[str]) -> Dict:
+    """Set the avatar (data URL) for a user. Returns the updated profile."""
+    ensure_tables()
+    con = storage.connect()
+    try:
+        con.execute("UPDATE users SET avatar = ? WHERE username = ?", [avatar, username])
+    finally:
+        con.close()
+    profile = get_profile(username) or {"username": username, "avatar": avatar, "created_at": None}
+    return profile
+
+
+def change_username(old_username: str, new_username: str) -> str:
+    """Rename an account (login handle), moving sessions and reset tokens along.
+
+    Returns the new username. Raises ValueError for invalid targets
+    and UsernameTakenError when the name is already registered.
+    """
+    new_username = new_username.strip()
+    if not re.match(r"^[A-Za-z0-9_.-]{3,32}$", new_username):
+        raise ValueError("Username must be 3-32 chars: letters, digits, _ . -")
+    if old_username.lower() == new_username.lower():
+        return old_username
+
+    ensure_tables()
+    con = storage.connect()
+    try:
+        exists = con.execute(
+            "SELECT 1 FROM users WHERE username = ?", [old_username]
+        ).fetchone()
+        if exists is None:
+            raise ValueError("Unknown user")
+        taken = con.execute(
+            "SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)",
+            [new_username],
+        ).fetchone()
+        if taken is not None:
+            raise UsernameTakenError(f"Username already registered: {new_username}")
+        # rename the account and all its live sessions / pending resets
+        con.execute("UPDATE users SET username = ? WHERE username = ?",
+                    [new_username, old_username])
+        con.execute("UPDATE sessions SET username = ? WHERE username = ?",
+                    [new_username, old_username])
+        con.execute("UPDATE reset_tokens SET username = ? WHERE username = ?",
+                    [new_username, old_username])
+        # drop every existing session so old tokens die; a fresh pair is
+        # issued right after the rename completes
+        con.execute("DELETE FROM sessions WHERE username = ?", [new_username])
+    finally:
+        con.close()
+    return new_username
 
 
 # ---------------------------------------------------------------------------

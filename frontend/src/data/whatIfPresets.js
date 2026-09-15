@@ -1,98 +1,134 @@
 // Scenario presets for What-if Simulator
-// Each preset defines a node_id and adjustments that the backend understands
+// Presets are now fetched from the backend via `/what-if/presets/{route_id}`
+// to guarantee they are route-aware. This module provides a local fallback
+// catalog used when the backend endpoint is unavailable.
 
-export const SCENARIO_PRESETS = [
-  {
+const CHOKEPOINTS = new Set([
+  "suez",
+  "panama_canal",
+  "strait_of_malacca",
+  "bab_el_mandeb",
+  "strait_of_hormuz",
+  "strait_of_gibraltar",
+  "taiwan_strait",
+]);
+
+function buildLocalPresets(routeNodeIds = [], nodeLabels = {}) {
+  const nodes = routeNodeIds || [];
+  const label = (id) => nodeLabels[id] || id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const presets = [];
+
+  presets.push({
     id: "baseline",
-    name: "Baseline / Normal Conditions",
+    name: "Normal Conditions",
     description: "No disruptions — current corridor conditions.",
+    scenario_type: "baseline",
+    scope: "single",
     node_id: null,
     adjustments: {},
-    isCustom: false,
-  },
-  {
-    id: "suez_30",
-    name: "Suez Canal +30% Congestion",
-    description: "Moderate congestion increase at Suez Canal checkpoint.",
-    node_id: "suez",
-    adjustments: { congestion_mult: 1.3 },
-    isCustom: false,
-  },
-  {
-    id: "suez_60",
-    name: "Suez Canal +60% Congestion",
-    description: "Severe congestion increase at Suez Canal checkpoint.",
-    node_id: "suez",
-    adjustments: { congestion_mult: 1.6 },
-    isCustom: false,
-  },
-  {
-    id: "suez_closed",
-    name: "Suez Canal Closed",
-    description: "Complete closure of Suez Canal — forces rerouting.",
-    node_id: "suez",
-    adjustments: { close: true },
-    isCustom: false,
-  },
-  {
-    id: "indian_ocean_weather",
-    name: "Severe Weather at Indian Ocean",
-    description: "Adverse weather conditions adding delay in the Indian Ocean leg.",
-    node_id: "indian_ocean",
-    adjustments: { weather_shift: 24 },
-    isCustom: false,
-  },
-  {
-    id: "malacca_congestion",
-    name: "Malacca Strait Congestion",
-    description: "Congestion build-up in the Strait of Malacca leg.",
-    node_id: "strait_of_malacca",
-    adjustments: { congestion_mult: 1.5 },
-    isCustom: false,
-  },
-  {
-    id: "singapore_delay",
-    name: "Singapore Port Congestion",
-    description: "Port congestion at Singapore adding processing delay.",
-    node_id: "singapore",
-    adjustments: { weather_shift: 12, congestion_mult: 1.2 },
-    isCustom: false,
-  },
-  {
-    id: "multi_disruption",
-    name: "Multi-Checkpoint Disruption",
-    description: "Combined disruptions across multiple checkpoints.",
-    node_id: "suez",
-    adjustments: { congestion_mult: 1.4, weather_shift: 18 },
-    isCustom: false,
-  },
-  {
+    available: true,
+  });
+
+  if (!nodes.length) {
+    presets.push({
+      id: "custom",
+      name: "Custom Scenario",
+      description: "Define your own scenario.",
+      scenario_type: "custom",
+      scope: "single",
+      node_id: null,
+      adjustments: { congestion_mult: 1.0, weather_shift: 0 },
+      available: true,
+    });
+    return presets;
+  }
+
+  const congestionLevels = [
+    ["moderate_congestion", "Moderate Congestion", "30% congestion increase", 1.3],
+    ["severe_congestion", "Severe Congestion", "60% congestion increase", 1.6],
+    ["major_congestion", "Major Congestion", "100% congestion increase", 2.0],
+  ];
+  for (const [id, name, desc, mult] of congestionLevels) {
+    presets.push({
+      id,
+      name,
+      description: `${desc} at ${label(nodes[Math.floor(nodes.length / 2)])}.`,
+      scenario_type: "congestion",
+      scope: "single",
+      node_id: nodes[Math.floor(nodes.length / 2)],
+      adjustments: { congestion_mult: mult },
+      available: true,
+    });
+  }
+
+  presets.push({
+    id: "severe_weather",
+    name: "Severe Weather",
+    description: "Severe weather adding 48 hours of additional delay.",
+    scenario_type: "weather",
+    scope: "single",
+    node_id: nodes[Math.floor(nodes.length / 2)],
+    adjustments: { weather_shift: 48 },
+    available: true,
+  });
+
+  for (const nid of nodes) {
+    if (CHOKEPOINTS.has(nid)) {
+      presets.push({
+        id: `closure_${nid}`,
+        name: `${label(nid)} Closed`,
+        description: `Complete closure of ${label(nid)}.`,
+        scenario_type: "closure",
+        scope: "single",
+        node_id: nid,
+        adjustments: { close: true },
+        available: true,
+      });
+    }
+  }
+
+  if (nodes.length >= 3) {
+    const multiNodes = nodes.slice(-3);
+    presets.push({
+      id: "multi_disruption",
+      name: "Multi-Checkpoint Disruption",
+      description: "Combined disruptions across multiple route checkpoints.",
+      scenario_type: "multi_checkpoint",
+      scope: "multi",
+      node_ids: multiNodes,
+      node_adjustments: multiNodes.map((n) => ({ node_id: n, congestion_mult: 1.4, weather_shift: 12 })),
+      available: true,
+    });
+  }
+
+  presets.push({
     id: "custom",
     name: "Custom Scenario",
-    description: "Define your own checkpoint, congestion, and weather adjustments.",
-    node_id: "suez",
+    description: "Define your own checkpoint, congestion, weather, and closure adjustments.",
+    scenario_type: "custom",
+    scope: "single",
+    node_id: nodes[0],
     adjustments: { congestion_mult: 1.0, weather_shift: 0 },
-    isCustom: true,
-  },
-];
+    available: true,
+  });
 
-/**
- * Get preset by ID
- */
-export function getPresetById(id) {
-  return SCENARIO_PRESETS.find((p) => p.id === id) || SCENARIO_PRESETS[0];
+  return presets;
 }
 
-/**
- * Get all presets except custom
- */
-export function getStandardPresets() {
-  return SCENARIO_PRESETS.filter((p) => !p.isCustom);
+export const SCENARIO_PRESETS = buildLocalPresets();
+
+export function buildPresetsForRoute(routeNodeIds, nodeLabels) {
+  return buildLocalPresets(routeNodeIds, nodeLabels);
 }
 
-/**
- * Get custom preset
- */
-export function getCustomPreset() {
-  return SCENARIO_PRESETS.find((p) => p.isCustom);
+export function getPresetById(id, presets = SCENARIO_PRESETS) {
+  return presets.find((p) => p.id === id) || presets[0];
+}
+
+export function getStandardPresets(presets = SCENARIO_PRESETS) {
+  return presets.filter((p) => !p.isCustom);
+}
+
+export function getCustomPreset(presets = SCENARIO_PRESETS) {
+  return presets.find((p) => p.isCustom);
 }

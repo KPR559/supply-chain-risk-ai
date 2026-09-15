@@ -1,63 +1,63 @@
 import React from "react";
-import { formatPercent, formatDelay, getChangeClass } from "../../utils/whatIfUtils.js";
+import { formatPercent, formatChange, getChangeClass } from "../../utils/whatIfUtils.js";
 
-export default function CheckpointImpactTable({ impacts, affectedNodeId }) {
-  if (!impacts || impacts.length === 0) return null;
+export default function CheckpointImpactTable({ result }) {
+  const impacts = result?.checkpoint_impact || [];
+  if (impacts.length === 0) return null;
 
-  // Sort by absolute risk change descending
-  const sortedImpacts = [...impacts].sort(
-    (a, b) => Math.abs(b.riskChange) - Math.abs(a.riskChange)
-  );
+  // Sorted by ascending sequence (route order) — affected rows marked
+  const sorted = [...impacts].sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
   return (
     <section className="panel what-if-checkpoint-impact">
       <h2>Checkpoint Impact</h2>
-      <p className="muted">Per-checkpoint risk and delay changes from the scenario</p>
+      <p className="muted">Per-checkpoint risk and delay changes from the scenario (route order)</p>
 
       <div className="table-container">
         <table className="data-table impact-table">
           <thead>
             <tr>
+              <th>#</th>
               <th>Checkpoint</th>
               <th className="numeric">Baseline Risk</th>
               <th className="numeric">Scenario Risk</th>
-              <th className="numeric">Risk Change</th>
+              <th className="numeric">Risk Δ</th>
               <th className="numeric">Baseline Delay</th>
               <th className="numeric">Scenario Delay</th>
-              <th className="numeric">Delay Change</th>
-              <th>Regime / Status</th>
+              <th className="numeric">Delay Δ</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {sortedImpacts.map((impact) => {
-              const riskChangeClass = getChangeClass(impact.riskChange, true);
-              const delayChangeClass = getChangeClass(impact.delayChange, true);
-              const isAffected = impact.isAffected || impact.node_id === affectedNodeId;
-
+            {sorted.map((impact) => {
+              const riskChangeClass = getChangeClass(impact.risk_change_pct, true);
+              const delayChangeClass = getChangeClass(impact.delay_change_hours, true);
               return (
-                <tr key={impact.node_id} className={isAffected ? "affected-row" : ""}>
+                <tr key={impact.node_id} className={impact.is_affected ? "affected-row" : ""}>
+                  <td className="numeric muted">{impact.sequence}</td>
                   <td className="checkpoint-cell">
-                    <span className={`checkpoint-name ${isAffected ? "affected" : ""}`}>
+                    <span className={`checkpoint-name ${impact.is_affected ? "affected" : ""}`}>
                       {impact.label}
-                      {isAffected && <span className="affected-badge">Affected</span>}
+                      {impact.is_affected && <span className="affected-badge">Affected</span>}
                     </span>
                   </td>
-                  <td className="numeric">{formatPercent(impact.baseRisk / 100)}</td>
-                  <td className="numeric">{formatPercent(impact.scenRisk / 100)}</td>
+                  <td className="numeric">{formatPercent(impact.baseline_risk)}</td>
+                  <td className="numeric">{formatPercent(impact.scenario_risk)}</td>
                   <td className="numeric">
                     <span className={`change-value ${riskChangeClass}`}>
-                      {impact.riskChange > 0 ? "+" : ""}{impact.riskChange.toFixed(1)}%
+                      {impact.risk_change_pct > 0 ? "+" : ""}
+                      {impact.risk_change_pct.toFixed(1)}pp
                     </span>
                   </td>
-                  <td className="numeric">{formatDelay(impact.baseDelay)}</td>
-                  <td className="numeric">{formatDelay(impact.scenDelay)}</td>
+                  <td className="numeric">{impact.baseline_delay_hours.toFixed(1)}h</td>
+                  <td className="numeric">{impact.scenario_delay_hours.toFixed(1)}h</td>
                   <td className="numeric">
                     <span className={`change-value ${delayChangeClass}`}>
-                      {impact.delayChange > 0 ? "+" : ""}{impact.delayChange.toFixed(1)} days
+                      {formatChange(impact.delay_change_hours, "h")}
                     </span>
                   </td>
                   <td>
-                    <span className={`status-badge ${impact.statusClass}`}>
+                    <span className={`status-badge ${impact.status_class}`}>
                       {impact.status}
                     </span>
                   </td>

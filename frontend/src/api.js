@@ -62,6 +62,28 @@ async function post(path, body, { token = null } = {}) {
   return res.json();
 }
 
+async function patch(path, body, { token = null } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    const err = new Error(`Network error: ${path}`);
+    err.status = 0;
+    throw err;
+  }
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw httpError(res.status, path, errBody);
+  }
+  return res.json();
+}
+
 const ROUTE_ENDPOINTS = {
   asia_europe_suez: ["shanghai", "rotterdam"],
   asia_europe_cape: ["shanghai", "rotterdam"],
@@ -81,6 +103,8 @@ export const api = {
   forgotPassword: (username) => post("/forgot-password", { username }),
   resetPassword: (token, newPassword) => post("/reset-password", { token, new_password: newPassword }),
   changePassword: (oldPassword, newPassword, token) => post("/change-password", { old_password: oldPassword, new_password: newPassword }, { token }),
+  updateProfile: (avatar, token) => patch("/account/profile", { avatar }, { token }),
+  changeUsername: (newUsername, token) => post("/account/username", { new_username: newUsername }, { token }),
   logout: (token) => post("/logout", {}, { token }),
   deleteAccount: (token) => del("/account", { token }),
   demo: () => get("/demo"),
@@ -94,8 +118,9 @@ export const api = {
       ...(deadlineDate ? { deadline_date: deadlineDate } : {}),
     });
   },
-  whatif: (shipmentId, name, nodeId, adjustments) =>
-    post("/what-if", { shipment_id: shipmentId, name, node_id: nodeId, adjustments }),
+  whatif: (shipmentId, payload) =>
+    post("/what-if", { shipment_id: shipmentId, ...payload }),
+  whatifPresets: (routeId) => get(`/what-if/presets/${routeId}`),
   compare: (shipmentId, objectives) =>
     post("/compare-routes", { shipment_id: shipmentId, objectives }),
   explain: (shipmentId) => get(`/explanation/${shipmentId}`),

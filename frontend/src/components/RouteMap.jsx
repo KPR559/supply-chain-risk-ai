@@ -9,15 +9,6 @@ import AiSection from "./llm/AiSection.jsx";
 import { riskColor, riskClass } from "../utils/helpers.js";
 import { loadUiPrefs, saveUiPrefs } from "../prefs.js";
 
-const SHORT_NAMES = {
-  asia_europe_suez: "Suez",
-  asia_europe_cape: "Cape",
-  trans_pacific: "Trans-Pac",
-  asia_us_east_panama: "Panama",
-  suez: "Suez",
-  cape: "Cape",
-  dubai: "Dubai",
-};
 const KIND_LABELS = {
   origin: "Origin",
   warehouse: "Hub",
@@ -92,15 +83,14 @@ const CY_STYLE = [
   { selector: "edge.risk-med", style: { "line-color": "#f59e0b" } },
   { selector: "edge.risk-high", style: { "line-color": "#ef4444" } },
   { selector: "edge.route-active", style: { width: 2.4, opacity: 0.85 } },
-  { selector: "edge.route-alt", style: { "line-color": "#3d4d6d", width: 1.5, opacity: 0.35 } },
 ];
 
 export default function RouteMap({ activeRouteId = "suez", nodes = [], prediction = null, aiAvailable = null }) {
   const [routes, setRoutes] = useState([]);
   const [failed, setFailed] = useState(false);
-  const [visible, setVisible] = useState({});
   const [hover, setHover] = useState(null);
   const [selected, setSelected] = useState(null);
+<<<<<<< HEAD
   const [selEdge, setSelEdge] = useState(null);
   const [aiNode, setAiNode] = useState({ id: null, text: null });
   const [aiNodeLoading, setAiNodeLoading] = useState(false);
@@ -111,6 +101,10 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [], predictio
     return saved === "graph" || saved === "world" ? saved : "globe";
   }); // 'globe' | 'world' | 'graph'
   const [view, setView] = useState({ x: 0, y: 0, z: 1 }); // shared cy pan/zoom for the bg layer
+=======
+  const [layout, setLayout] = useState(() => (loadUiPrefs().mapLayout === "graph" ? "graph" : "world"));
+  const [view, setView] = useState({ x: 0, y: 0, z: 1 });
+>>>>>>> 25d4c34d3a17571ed7a99885ba8826702a693e2e
   const wrapRef = useRef(null);
   const cyRef = useRef(null);
   const globeRef = useRef(null);
@@ -157,6 +151,7 @@ const sizeRef = useRef({ width: 800, height: 460 });
     if (graphsLoadRef.current) return;
     graphsLoadRef.current = (async () => {
       try {
+<<<<<<< HEAD
         const g = await api.graphs();
         setRoutes(g.routes || []);
         setVisible(Object.fromEntries((g.routes || []).map((r) => [r.route_id, true])));
@@ -171,6 +166,17 @@ const sizeRef = useRef({ width: 800, height: 460 });
       }
     })();
   }, []);
+=======
+        const r = await api.graph(activeRouteId);
+        if (!alive) return;
+        setRoutes([r]);
+      } catch (e) {
+        if (alive) setFailed(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, [activeRouteId]);
+>>>>>>> 25d4c34d3a17571ed7a99885ba8826702a693e2e
 
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -350,12 +356,10 @@ const sizeRef = useRef({ width: 800, height: 460 });
       });
     }
     for (const route of routes) {
-      if (!visible[route.route_id]) continue;
-      const isActive = route.route_id === activeRouteId;
       for (const e of route.edges) {
+        if (!merged[e.src] || !merged[e.dst]) continue;
         const a = merged[e.src];
         const b = merged[e.dst];
-        if (!a || !b) continue;
         const midProb = (a.prob + b.prob) / 2;
         cy.add({
           group: "edges",
@@ -368,10 +372,14 @@ const sizeRef = useRef({ width: 800, height: 460 });
             baseline_days: e.baseline_days,
             srcLabel: a.label || e.src,
             dstLabel: b.label || e.dst,
+<<<<<<< HEAD
             bow: 0,
             label: isActive ? `~${e.baseline_days}d` : "",
+=======
+            label: `~${e.baseline_days}d`,
+>>>>>>> 25d4c34d3a17571ed7a99885ba8826702a693e2e
           },
-          classes: `mode-${e.mode} risk-${riskClass(midProb)} ${isActive ? "route-active" : "route-alt"}`,
+          classes: `mode-${e.mode} risk-${riskClass(midProb)} route-active`,
         });
       }
     }
@@ -380,8 +388,9 @@ const sizeRef = useRef({ width: 800, height: 460 });
     cy.layout({ name: "preset", fit: true, padding: 45 }).run();
     const p = cy.pan();
     setView({ x: p.x, y: p.y, z: cy.zoom() });
-  }, [routes, visible, activeRouteId, merged, layout]);
+  }, [routes, activeRouteId, merged, layout]);
 
+<<<<<<< HEAD
   const toggle = (rid) => setVisible((v) => ({ ...v, [rid]: !v[rid] }));
   const chooseLayout = (next) => {
     setLayout(next);
@@ -391,6 +400,8 @@ const sizeRef = useRef({ width: 800, height: 460 });
       // ignore
     }
   };
+=======
+>>>>>>> 25d4c34d3a17571ed7a99885ba8826702a693e2e
 
   const zoomBy = (factor) => {
     const cy = cyRef.current;
@@ -581,25 +592,6 @@ const sizeRef = useRef({ width: 800, height: 460 });
   return (
     <div>
       <div className="route-toggles">
-        {routes.map((r) => {
-          const on = visible[r.route_id];
-          const isActive = r.route_id === activeRouteId;
-          const dist = Math.round(r.edges.reduce((s, e) => s + e.distance_km, 0));
-          const days = r.edges.reduce((s, e) => s + e.baseline_days, 0);
-          return (
-            <button
-              key={r.route_id}
-              className={`route-chip ${on ? "on" : "off"} ${isActive ? "active" : ""}`}
-              onClick={() => toggle(r.route_id)}
-              title={on ? "Hide this route" : "Show this route"}
-            >
-              <span className="chip-dot" />
-              {isActive ? "★ " : ""}
-              {SHORT_NAMES[r.route_id] || r.route_id}
-              <span className="chip-meta">· {dist.toLocaleString()} km · ~{Math.round(days)}d</span>
-            </button>
-          );
-        })}
         <span className="seg" role="group" aria-label="Map layout">
           <button className={`seg-btn ${layout === "globe" ? "on" : ""}`} onClick={() => chooseLayout("globe")} title="Real 3D globe (drag to rotate, scroll to zoom)">Globe</button>
           <button className={`seg-btn ${layout === "world" ? "on" : ""}`} onClick={() => chooseLayout("world")} title="Flat world map (lon/lat projection)">World</button>

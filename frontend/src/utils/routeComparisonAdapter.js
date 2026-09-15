@@ -12,9 +12,9 @@ import { generateRecommendation } from "./formatters.js";
 export function adaptRouteComparison(compareData) {
   if (!compareData || !compareData.options || compareData.options.length === 0) {
     return {
-      routes: FALLBACK_ROUTES,
-      isFallback: true,
-      recommendation: generateRecommendation(FALLBACK_ROUTES),
+      routes: [],
+      isFallback: false,
+      recommendation: null,
     };
   }
 
@@ -29,6 +29,8 @@ export function adaptRouteComparison(compareData) {
     distance: r.distance ?? r.distance_km ?? r.distanceKm,
     resilience: r.resilience ?? r.resilience_score ?? r.resilienceScore,
     recommended: r.recommended ?? false,
+    isCurrent: r.is_current ?? false,
+    reasons: r.reasons ?? [],
   }));
 
   // Get backend recommendation if available
@@ -43,7 +45,7 @@ export function adaptRouteComparison(compareData) {
 
   // Generate recommendation
   const recommendation = backendRecommendation
-    ? { route: backendRecommendation, text: `${backendRecommendation.scenario} offers the best balance of risk and transit time for this shipment corridor.` }
+    ? { route: backendRecommendation, reasons: backendRecommendation.reasons }
     : generateRecommendation(normalizedRoutes);
 
   return {
