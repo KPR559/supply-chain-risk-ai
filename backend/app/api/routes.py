@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 
 from backend.app.schemas.models import (ChangePasswordRequest, CompareRoutesRequest,
-                                     ForgotRequest, LoginRequest, PredictRequest,
+                                     ForgotRequest, LLMChatRequest, LLMExplainRequest,
+                                     LLMReportRequest, LoginRequest, PredictRequest,
                                      RegisterRequest, ResetRequest,
                                      ScenarioAdjustment, SimulateRequest,
                                      WhatIfRequest)
@@ -62,6 +63,19 @@ def _run_demo_prediction() -> Dict:
     )
 
 
+def _llm_meta() -> Dict[str, Any]:
+    """Provider/model identity (never raises)."""
+    try:
+        from backend.core.llm import get_llm
+        cfg = getattr(get_llm(), "_cfg", None)
+        return {
+            "provider": getattr(cfg, "provider", "ollama"),
+            "model": getattr(cfg, "model", "unknown"),
+        }
+    except Exception:
+        return {"provider": "ollama", "model": "unknown"}
+
+
 @router.get("/health")
 def health() -> Dict[str, Any]:
     s = get_settings()
@@ -69,6 +83,16 @@ def health() -> Dict[str, Any]:
         warehouse = storage.warehouse_tables()
     except Exception:
         warehouse = []
+    try:
+        from backend.core.llm import get_llm
+        llm = get_llm()
+        llm_info = {
+            **_llm_meta(),
+            "available": llm.is_available(),
+            "base_url": getattr(getattr(llm, "_cfg", None), "base_url", "http://localhost:11434"),
+        }
+    except Exception:
+        llm_info = {**_llm_meta(), "available": False}
     return {
         "status": "ok",
         "models": registry.list_models(),
@@ -79,6 +103,7 @@ def health() -> Dict[str, Any]:
             "nlp_engine": s.nlp_engine,
             "mc_simulations": s.mc_simulations,
         },
+        "llm": llm_info,
     }
 
 
@@ -456,6 +481,16 @@ def whatif(req: WhatIfRequest) -> Dict[str, Any]:
     result["delta_expected_days"] = round(sc.get("expected_days", 0.0)
                                           - baseline.get("expected_days", 0.0), 2)
     result["delta_p90_days"] = round(sp.get("p90", 0.0) - bp.get("p90", 0.0), 2)
+    # Mirror the deltas on the scenario monte_carlo block so summary cards
+    # that read only the simulation payload see them.
+    sc["delta_expected_days"] = result["delta_expected_days"]
+    sc["delta_p90_days"] = result["delta_p90_days"]
+    # Use the live prediction's baseline resilience for the delta so the
+    # summary card and the comparison table remain consistent.
+    base_res = baseline.get("resilience_score")
+    scen_res = sc.get("resilience_score")
+    if base_res is not None and scen_res is not None:
+        sc["delta_resilience"] = round(scen_res - base_res, 1)
     return result
 
 
@@ -464,6 +499,76 @@ def compare_routes_api(req: CompareRoutesRequest) -> Dict[str, Any]:
     shipment = _load(req.shipment_id)
     eng = get_engine()
     return eng.compare(shipment, req.objectives)
+
+
+# ---------------------------------------------------------------------------
+# LLM narrative endpoints. The engine computed every number; the LLM only
+# explains it. All endpoints degrade to status "unavailable" when Ollama is
+# not reachable so the UI hides the AI panels instead of failing.
+# ---------------------------------------------------------------------------
+
+@router.post("/llm/explain")
+def llm_explain(req: LLMExplainRequest) -> Dict[str, Any]:
+    from backend.core import llm_service
+    node = req.node
+    if node is None and req.node_id:
+        node = next((n for n in (req.prediction or {}).get("node_predictions", [])
+                     if n.get("node_id") == req.node_id), None)
+    try:
+        res = llm_service.explain_panels(
+            prediction=req.prediction,
+            explanation=req.explanation,
+            recommendations=req.recommendations or [],
+            panels=req.panels or ["situation", "risk", "eta", "deadline", "drivers"],
+            trend=req.trend,
+            node=node,
+            edge=req.edge,
+        )
+    except Exception as exc:  # pragma: no cover - depends on local Ollama
+        log.warning("llm/explain error", extra={"extra_fields": {"error": str(exc)}})
+        return {"status": "error", "error": str(exc), "panels": {},
+                "recommendations_list": [], "node": None, "edge": None,
+                "meta": _llm_meta()}
+    return {
+        "status": "ok" if res["meta"]["available"] else "unavailable",
+        "error": None,
+        "panels": res["panels"],
+        "recommendations_list": res["recommendations_list"],
+        "node": res["node"],
+        "edge": res["edge"],
+        "meta": res["meta"],
+    }
+
+
+@router.post("/llm/chat")
+def llm_chat(req: LLMChatRequest) -> Dict[str, Any]:
+    from backend.core import llm_service
+    try:
+        text = llm_service.chat(req.prediction or {}, req.question, req.history or [])
+    except Exception as exc:  # pragma: no cover
+        log.warning("llm/chat error", extra={"extra_fields": {"error": str(exc)}})
+        return {"status": "error", "error": str(exc), "text": None, "meta": _llm_meta()}
+    return {
+        "status": "ok" if text else "unavailable",
+        "error": None,
+        "text": text,
+        "meta": {**_llm_meta(), "available": bool(text)},
+    }
+
+
+@router.post("/llm/report")
+def llm_report(req: LLMReportRequest) -> Dict[str, Any]:
+    from backend.core import llm_service
+    try:
+        r = llm_service.report(req.prediction, req.explanation, req.critical)
+    except Exception as exc:  # pragma: no cover
+        log.warning("llm/report error", extra={"extra_fields": {"error": str(exc)}})
+        return {"status": "error", "error": str(exc), "title": None, "markdown": None,
+                "meta": _llm_meta()}
+    if not r:
+        return {"status": "unavailable", "error": None, "title": None, "markdown": None,
+                "meta": _llm_meta()}
+    return {"status": "ok", "error": None, **r, "meta": _llm_meta()}
 
 
 # ---------------------------------------------------------------------------

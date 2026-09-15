@@ -3,7 +3,7 @@ import RouteMap from "../components/RouteMap.jsx";
 import TabState from "../components/TabState.jsx";
 
 export default function RouteMapView({ data }) {
-  const { prediction, loading, apiError, onRetry } = data;
+  const { prediction, health, loading, apiError, onRetry } = data;
   const route = prediction?.route_id;
 
   return (
@@ -25,7 +25,12 @@ export default function RouteMapView({ data }) {
 
       {prediction && (
         <section className="panel">
-          <RouteMap activeRouteId={route} nodes={prediction?.node_predictions} />
+          <RouteMap
+            activeRouteId={route}
+            nodes={prediction?.node_predictions}
+            prediction={prediction}
+            aiAvailable={health?.llm?.available ?? null}
+          />
         </section>
       )}
     </div>

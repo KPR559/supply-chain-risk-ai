@@ -71,6 +71,7 @@ export default function ScenarioResultsSummary({
       label: "Resilience Score",
       value: resilience != null ? formatResilience(resilience) : "—",
       unit: null,
+      changeUnit: "pts",
       change: resilienceChange,
     },
   ];
@@ -90,7 +91,7 @@ export default function ScenarioResultsSummary({
               {metric.unit && <span className="result-unit">{metric.unit}</span>}
               {metric.change != null && (
                 <span className={`result-change ${metric.change > 0 ? "increase" : metric.change < 0 ? "decrease" : "neutral"}`}>
-                  {metric.change > 0 ? "+" : ""}{metric.change.toFixed(1)} {metric.unit || "days"}
+                  {metric.change > 0 ? "+" : ""}{metric.change.toFixed(1)} {metric.changeUnit || metric.unit || "days"}
                 </span>
               )}
             </div>

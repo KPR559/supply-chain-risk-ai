@@ -25,8 +25,10 @@ import SettingsView from "./pages/SettingsView.jsx";
 import SystemSettingsView from "./pages/SystemSettingsView.jsx";
 import AccountSettingsView from "./pages/AccountSettingsView.jsx";
 import Toast from "./components/Toast.jsx";
+import ChatAssistant from "./components/llm/ChatAssistant.jsx";
 import { loadUiPrefs } from "./prefs.js";
 import { riskBand } from "./models.js";
+import { buildRecommendations } from "./recommendations.js";
 
 
 const DEFAULT_ROUTE = "asia_europe_suez";
@@ -63,6 +65,14 @@ export default function App() {
   const shipmentSnapRef = React.useRef({});
   const [health, setHealth] = useState(null);
   const [dq, setDq] = useState(null);
+  // LLM narratives keyed: { situation, risk, eta, deadline, drivers } texts,
+  // plus aiRecs (per-recommendation explanations paralleling
+  // buildRecommendations output). Cached per prediction so tab switches
+  // never refetch; the endpoint itself degrades silently when Ollama is off.
+  const [ai, setAi] = useState({});
+  const [aiRecs, setAiRecs] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const aiCacheRef = React.useRef({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -136,8 +146,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, shipments, selectedId, warmShipmentSnapshots]);
 
-  const loadBase = useCallback(
-    async (routeId, simCount = nSim, deadlineDate = null) => {
+  const loadBase = useCallback(    async (routeId, simCount = nSim, deadlineDate = null) => {
       setLoading(true);
       setError(null);
       try {
@@ -166,6 +175,61 @@ export default function App() {
     },
     [nSim]
   );
+
+  // Fetch LLM narratives once per prediction (situation/risk/recs/eta/
+  // deadline/drivers). React <StrictMode> mounts effects twice and both
+  // loadBase batches (explanation + critical) re-run this effect, so a naive
+  // fetch would fire several identical 6-panel calls and overload Ollama.
+  // Instead we keep one in-flight promise per prediction; every effect run
+  // attaches to it, so exactly one request is issued and each mount updates
+  // state when it resolves. Skipped silently when the LLM is known-offline.
+  useEffect(() => {
+    if (!user || !prediction || !explanation) return;
+    if (health && health.llm && health.llm.available === false) return;
+    const key = `${prediction.shipment_id}|${prediction.route_id}`;
+    let alive = true;
+    let inflight = aiCacheRef.current[key];
+    if (inflight?.phase === "done") {
+      setAi(inflight.panels || {});
+      setAiRecs(inflight.recommendations_list || []);
+      return;
+    }
+    if (!inflight || inflight.phase !== "inflight") {
+      const recs = buildRecommendations({ prediction, explanation, critical });
+      const promise = api
+        .llmExplain({
+          prediction,
+          explanation,
+          recommendations: recs.map(({ title, why, impact }) => ({ title, why, impact })),
+          panels: ["situation", "risk", "recommendations", "eta", "deadline", "drivers"],
+        })
+        .then((res) => ({
+          panels: res?.panels || {},
+          recommendations_list: res?.recommendations_list || [],
+        }))
+        .catch(() => ({ panels: {}, recommendations_list: [] }));
+      inflight = { phase: "inflight", promise };
+      aiCacheRef.current[key] = inflight;
+      setAiLoading(true);
+    }
+    inflight.promise
+      .then((r) => {
+        if (aiCacheRef.current[key]?.phase === "inflight") {
+          aiCacheRef.current[key] = { phase: "done", ...r };
+        }
+        if (alive) {
+          setAi(r.panels);
+          setAiRecs(r.recommendations_list);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setAiLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user, prediction, explanation, critical, selectedId, health]);
 
   useEffect(() => {
     if (!user) return;
@@ -227,6 +291,8 @@ export default function App() {
         setPrediction(null);
         setExplanation(null);
         setCritical(null);
+        setAi({});
+        setAiRecs([]);
       }
     }
   };
@@ -276,6 +342,8 @@ export default function App() {
     setPrediction(null);
     setExplanation(null);
     setCritical(null);
+    setAi({});
+    setAiRecs([]);
     setError(null);
     setView("results");
   };
@@ -293,6 +361,8 @@ export default function App() {
     setPrediction(null);
     setExplanation(null);
     setCritical(null);
+    setAi({});
+    setAiRecs([]);
     setError(null);
     setView("results");
     return null;
@@ -404,6 +474,9 @@ export default function App() {
     onEditShipment: updateShipment,
     onDeleteShipment: deleteShipment,
     shipmentStatus,
+    ai,
+    aiRecs,
+    aiLoading,
   };
 
   if (!user) {
@@ -443,6 +516,7 @@ export default function App() {
 
         <ViewComponent data={data} />
         <Toast toast={toast} />
+        <ChatAssistant prediction={prediction} available={health?.llm?.available} />
       </div>
     </div>
   );

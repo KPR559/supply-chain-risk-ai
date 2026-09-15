@@ -102,6 +102,14 @@ class Settings:
     nlp_engine: str = field(default_factory=lambda: _env("NLP_ENGINE", "local"))
     llm_api_key: str = field(default_factory=lambda: _env("LLM_API_KEY", ""))
 
+    # LLM provider settings (Ollama / OpenAI-compatible)
+    llm_provider: str = field(default_factory=lambda: _env("LLM_PROVIDER", "ollama"))
+    llm_model: str = field(default_factory=lambda: _env("LLM_MODEL", "llama3.2:latest"))
+    llm_base_url: str = field(default_factory=lambda: _env("LLM_BASE_URL", "http://localhost:11434"))
+    llm_temperature: float = field(default_factory=lambda: _env_float("LLM_TEMPERATURE", 0.3))
+    llm_max_tokens: int = field(default_factory=lambda: _env_int("LLM_MAX_TOKENS", 2048))
+    llm_timeout: float = field(default_factory=lambda: _env_float("LLM_TIMEOUT", 120.0))
+
     demo_seed: int = field(default_factory=lambda: _env_int("DEMO_SEED", 7))
 
     auth_user: str = field(default_factory=lambda: _env("AUTH_USER", "admin"))

@@ -25,3 +25,6 @@ joblib==1.5.1
 
 # Graphs
 networkx>=3.0
+
+# LLM (OpenAI-compatible; used by Ollama and other local/cloud providers)
+openai>=1.20

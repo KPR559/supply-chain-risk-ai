@@ -1963,14 +1963,40 @@ input[type="number"] { width: 90px; }
 .kpi-tone-warn { border-left-color: rgba(245, 158, 11, 0.7); }
 .kpi-tone-bad { border-left-color: rgba(239, 68, 68, 0.7); }
 
+/* Secondary (supporting) metrics — visually lighter than the headline row. */
+.secondary-metrics { margin-bottom: 20px; }
+.secondary-metrics > .summary-label { display: inline-block; margin-bottom: 8px; }
+.kpi-secondary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.kpi-secondary .kpi-card {
+  padding: 10px 12px;
+  background: transparent;
+  border-style: dashed;
+}
+.kpi-secondary .kpi-card:hover { background: linear-gradient(180deg, var(--panel), var(--panel2)); }
+.kpi-secondary .kpi-value { font-size: 16px; }
+
 /* Dashboard balanced pairs (no orphan columns) */
 .dash-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 .dash-pair > * { min-width: 0; }
+/* Recommendations card: match the paired risk card height and scroll the
+   recommendation list when its content is taller than the card. */
+.recs-panel { display: flex; flex-direction: column; }
+.recs-panel .rec-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+}
 .route-overview .map-cv { height: 380px; }
 
 /* Risk gauge */
@@ -1990,6 +2016,8 @@ input[type="number"] { width: 90px; }
 .gauge-den { font-size: 11px; color: var(--muted); }
 .gauge-band { margin-top: 8px; }
 .gauge-note { text-align: center; margin: 8px 0 0; }
+.risk-title { text-align: center; margin: 12px 0 0; font-size: 11px; letter-spacing: 0.5px; }
+.risk-headline { text-align: center; font-size: 12.5px; line-height: 1.5; margin: 10px 0 0; color: var(--text); }
 .risk-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2175,7 +2203,6 @@ input[type="number"] { width: 90px; }
 .rec-title { font-size: 13px; font-weight: 600; }
 .rec-why { font-size: 11.5px; color: var(--muted); margin: 5px 0 0; }
 .rec-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-.rec-impact { font-size: 11px; color: var(--muted); flex: 1; min-width: 140px; }
 
 /* Critical preview */
 .crit-preview-list { list-style: none; margin: 10px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -2247,11 +2274,13 @@ input[type="number"] { width: 90px; }
 /* Dashboard responsive */
 @media (max-width: 1100px) {
   .kpi-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .route-overview .map-cv { height: 300px; }
   .summary-id { font-size: 16px; }
   .kpi-grid-4 .kpi-value { font-size: 16px; white-space: normal; }
+  .kpi-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .toast { right: 12px; left: 12px; bottom: 12px; justify-content: center; }
 }
 
@@ -2802,4 +2831,171 @@ details.mq .model-grid { margin-top: 12px; }
 
 @media (max-width: 640px) {
   .settings-landing-grid { grid-template-columns: 1fr; }
+}
+
+/* ── AI (LLM) panels & assistant ── */
+.ai-panel {
+  border-style: dashed;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.07), var(--panel2));
+}
+.ai-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.ai-title { font-size: 12px; font-weight: 600; letter-spacing: 0.2px; }
+.ai-text {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.ai-source { margin: 0; font-size: 11px; color: var(--muted); }
+.sk-ai { height: 46px; margin-top: 4px; }
+.sk-inline { display: inline-block; height: 12px; width: 180px; vertical-align: middle; }
+.ai-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.ai-inline svg { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+.chat-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 120;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: linear-gradient(180deg, var(--primary-strong), #0b5e8a);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.chat-fab:hover { filter: brightness(1.15); }
+.chat-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 88px;
+  z-index: 120;
+  width: 350px;
+  max-width: calc(100vw - 48px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.chat-head svg { color: var(--accent); }
+.chat-head .chat-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+}
+.chat-head .chat-close:hover { color: var(--text); }
+.chat-shipment {
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.chat-log {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.chat-msg {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 8px 11px;
+  border-radius: 10px;
+  max-width: 92%;
+  white-space: pre-wrap;
+}
+.chat-msg.user {
+  align-self: flex-end;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--text);
+}
+.chat-msg.assistant {
+  align-self: flex-start;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.chat-msg.error { border-color: rgba(239, 68, 68, 0.4); color: var(--red); }
+.chat-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+.chat-chip {
+  font-size: 11px;
+  font-family: var(--sans);
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.chat-chip:hover { background: rgba(56, 189, 248, 0.1); }
+.chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-family: var(--sans);
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: var(--bg);
+  color: var(--text);
+}
+.chat-form input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.chat-note {
+  padding: 0 14px 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .chat-fab { right: 12px; bottom: 12px; }
+  .chat-panel { right: 12px; bottom: 76px; }
 }

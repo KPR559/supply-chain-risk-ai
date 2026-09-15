@@ -12,7 +12,6 @@ export default function AlertCard({ alert, read, timeLabel, onRead, onDismiss, o
       </div>
       <div className="alert-title">{alert.title}</div>
       <p className="alert-detail">{alert.detail}</p>
-      <p className="alert-action">→ {alert.action}</p>
       <div className="alert-foot">
         {onAction && (
           <button className="btn ghost mini-btn" onClick={() => onAction(alert.target)}>

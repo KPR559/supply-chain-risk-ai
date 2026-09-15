@@ -29,8 +29,8 @@ export default function BaselineVsScenarioComparison({ baseline, scenario }) {
   const comparisonMetrics = [
     {
       label: "Expected Transit Duration",
-      baseVal: getBase("expected_eta_days"),
-      scenVal: getScen("expected_eta_days"),
+      baseVal: getBase("expected_eta_days") ?? getBase("expected_days"),
+      scenVal: getScen("expected_eta_days") ?? getScen("expected_days"),
       format: formatEta,
       unit: "days",
       inverse: false, // lower is better

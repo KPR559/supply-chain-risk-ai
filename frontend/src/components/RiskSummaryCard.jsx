@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { NA, overallReason, riskBand } from "../models.js";
+import { NA, overallReason, riskBand, riskHeadline } from "../models.js";
+import AiSection from "./llm/AiSection.jsx";
 
 const BAND_COLOR = { low: "#22c55e", medium: "#f59e0b", high: "#ef4444", critical: "#ef4444" };
 
@@ -65,7 +66,7 @@ function Gauge({ score, band, label }) {
   );
 }
 
-export default function RiskSummaryCard({ prediction, explanation, critical, lastUpdated }) {
+export default function RiskSummaryCard({ prediction, explanation, critical, lastUpdated, aiRisk, aiLoading }) {
   const nodes = prediction?.node_predictions || [];
   const band = riskBand(nodes, prediction?.monte_carlo);
   const mainReason = overallReason({ prediction, explanation, critical });
@@ -82,22 +83,35 @@ export default function RiskSummaryCard({ prediction, explanation, critical, las
     : { text: "Trend unavailable", cls: "muted" };
 
   // Persist the snapshot after first paint so the recorded timestamps match
-  // when the trend is rendered.
+  // when the trend is rendered. Keep the previous score so the Risk Drivers
+  // "What changed?" panel can compare the last two runs for a route.
   useEffect(() => {
     if (!routeId) return;
     const store = readTrendStore();
-    store[routeId] = { score: band.score, ts: new Date().toISOString() };
+    const prior = store[routeId];
+    store[routeId] = {
+      score: band.score,
+      prev: prior && typeof prior.score === "number" ? prior.score : null,
+      ts: new Date().toISOString(),
+    };
     try { localStorage.setItem(TREND_KEY, JSON.stringify(store)); } catch { /* ignore */ }
   }, [routeId, band.score]);
 
   return (
     <section className="panel risk-card" aria-label="Risk summary">
       <h2>Risk Summary</h2>
+      <p className="risk-headline"> <br/><br/>
+       </p>
+      <div className="summary-label risk-title">Overall Shipment Risk</div>
+      <p className="risk-headline"> <br/><br/>
+       </p>
       <Gauge score={band.score} band={band.band} label={band.label} />
-      <p className="muted gauge-note">
-        Score {band.score}/100 · from the highest checkpoint delay probability
-        {band.escalated ? " · escalated by live disruption" : ""}
-      </p>
+      <p className="risk-headline"> <br/><br/>
+       </p>
+      <AiSection title="AI Risk Explanation" text={aiRisk} loading={aiLoading} />
+
+      <p className="risk-headline"> <br/>
+       </p>
 
       <dl className="risk-facts">
         <div className="risk-fact">
@@ -118,10 +132,6 @@ export default function RiskSummaryCard({ prediction, explanation, critical, las
         </div>
       </dl>
 
-      <div className="risk-reason">
-        <div className="summary-label">Main reason</div>
-        <p>{mainReason}</p>
-      </div>
     </section>
   );
 }

@@ -25,9 +25,9 @@ export function buildRecommendations({ prediction, explanation, critical }) {
   if (hasDeadline && miss >= 0.6) {
     out.push({
       priority: "high",
-      title: "Evaluate an alternative route",
-      why: `Deadline-miss probability is ${Math.round(miss * 100)}% — the current route is unlikely to deliver on time.`,
-      impact: "May cut disruption exposure and protect the customer commitment.",
+      title: "Evaluate alternative route",
+      why: "Current route has a high probability of missing the deadline.",
+      impact: "Lower delay exposure by switching routes.",
       actionLabel: "Compare Routes",
       target: "compare",
     });
@@ -39,8 +39,8 @@ export function buildRecommendations({ prediction, explanation, critical }) {
     out.push({
       priority: "high",
       title: "Recalculate ETA after the disruption update",
-      why: `${names} ${disrupted.length === 1 ? "is" : "are"} in a disrupted regime — the current ETA may already be stale.`,
-      impact: "Refreshes every dependent metric (KPIs, deadline risk, alerts).",
+      why: `${names} ${disrupted.length === 1 ? "is" : "are"} disrupted — the current ETA may be stale.`,
+      impact: "Refreshes all dependent risk metrics.",
       actionLabel: "Open What-if Simulator",
       target: "simulator",
     });
@@ -53,8 +53,8 @@ export function buildRecommendations({ prediction, explanation, critical }) {
     out.push({
       priority: hasDeadline && miss >= 0.35 ? "high" : "medium",
       title: `Monitor ${name}`,
-      why: `${name} carries the largest share of total shipment delay.`,
-      impact: "Early detection at the dominant checkpoint prevents cascade delays.",
+      why: `${name} carries the largest delay exposure.`,
+      impact: "Early warning at the dominant checkpoint.",
       actionLabel: "View Checkpoint",
       target: "checkpoints",
     });
@@ -68,7 +68,7 @@ export function buildRecommendations({ prediction, explanation, critical }) {
       priority: "medium",
       title: "Prepare customs documentation early",
       why: `${customs.label || customs.node_id} shows ${Math.round((customs.delay_probability ?? 0) * 100)}% delay probability.`,
-      impact: "Pre-cleared paperwork removes the most common customs-hold cause.",
+      impact: "Pre-cleared paperwork avoids the most common hold.",
       actionLabel: "View Checkpoint",
       target: "checkpoints",
     });
@@ -82,8 +82,8 @@ export function buildRecommendations({ prediction, explanation, critical }) {
     out.push({
       priority: "medium",
       title: isBaseline ? `Evaluate ${node} mitigation options` : `Reduce ${node} exposure — ${friendly.label}`,
-      why: `Top delay driver (${friendly.label}) contributes +${Number(topFactor.contribution).toFixed(2)} to delay probability at ${node}.`,
-      impact: "Directly lowers the riskiest checkpoint's delay probability.",
+      why: `${friendly.label} adds delay at ${node}.`,
+      impact: "Lowers the riskiest checkpoint's delay probability.",
       actionLabel: "View Risk Drivers",
       target: "contributors",
     });
@@ -93,8 +93,8 @@ export function buildRecommendations({ prediction, explanation, critical }) {
     out.push({
       priority: "low",
       title: "Maintain routine monitoring",
-      why: "No checkpoint breaches risk thresholds and the deadline outlook is healthy.",
-      impact: "Keeps situational awareness without spending mitigation budget.",
+      why: "No checkpoint breaches the risk threshold; the deadline outlook is healthy.",
+      impact: "Keeps situational awareness at no cost.",
       actionLabel: "Export Status Report",
       action: "export",
     });

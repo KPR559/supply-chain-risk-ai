@@ -4,6 +4,7 @@ import { feature } from "topojson-client";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import landTopo from "world-atlas/land-110m.json";
 import { api } from "../api.js";
+import AiSection from "./llm/AiSection.jsx";
 import { riskColor, riskClass } from "../utils/helpers.js";
 import { loadUiPrefs } from "../prefs.js";
 
@@ -91,12 +92,17 @@ const CY_STYLE = [
   { selector: "edge.route-alt", style: { "line-color": "#3d4d6d", width: 1.5, opacity: 0.35 } },
 ];
 
-export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
+export default function RouteMap({ activeRouteId = "suez", nodes = [], prediction = null, aiAvailable = null }) {
   const [routes, setRoutes] = useState([]);
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState({});
   const [hover, setHover] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [selEdge, setSelEdge] = useState(null);
+  const [aiNode, setAiNode] = useState({ id: null, text: null });
+  const [aiNodeLoading, setAiNodeLoading] = useState(false);
+  const [aiEdge, setAiEdge] = useState({ key: null, text: null });
+  const [aiEdgeLoading, setAiEdgeLoading] = useState(false);
   const [layout, setLayout] = useState(() => (loadUiPrefs().mapLayout === "graph" ? "graph" : "world")); // 'world' | 'graph'
   const [view, setView] = useState({ x: 0, y: 0, z: 1 }); // shared cy pan/zoom for the bg layer
   const wrapRef = useRef(null);
@@ -165,12 +171,28 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
     });
     cy.style(CY_STYLE);
     cy.on("tap", (e) => {
-      if (e.target === cy) setSelected(null);
+      if (e.target === cy) {
+        setSelected(null);
+        setSelEdge(null);
+      }
     });
     cy.on("tap", "node", (e) => {
       const id = e.target.id();
       if (id.startsWith("halo-")) return;
+      setSelEdge(null);
       setSelected((prev) => (prev === id ? null : id));
+    });
+    cy.on("tap", "edge", (e) => {
+      const ed = e.target;
+      setSelected(null);
+      setSelEdge({
+        key: ed.id(),
+        from: ed.data("srcLabel"),
+        to: ed.data("dstLabel"),
+        mode: ed.data("mode"),
+        distance_km: ed.data("distance_km"),
+        baseline_days: ed.data("baseline_days"),
+      });
     });
     cy.on("mouseover", "node", (e) => {
       const n = e.target;
@@ -363,6 +385,57 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
   const hoverNode = hover?.kind === "node" ? merged[hover.nid] : null;
   const flip = hover?.pos && hover.pos.x > sizeRef.current.width - 190;
 
+  // AI explanation for the selected checkpoint (graph stays authoritative).
+  useEffect(() => {
+    if (!selected || !prediction || aiAvailable === false) {
+      setAiNode({ id: null, text: null });
+      setAiNodeLoading(false);
+      return;
+    }
+    let alive = true;
+    setAiNodeLoading(true);
+    api
+      .llmExplain({ prediction, panels: ["node"], nodeId: selected })
+      .then((res) => {
+        if (alive) setAiNode({ id: selected, text: res?.panels?.node || null });
+      })
+      .catch(() => {
+        if (alive) setAiNode({ id: selected, text: null });
+      })
+      .finally(() => {
+        if (alive) setAiNodeLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selected, prediction, aiAvailable]);
+
+  // AI explanation for the selected segment.
+  useEffect(() => {
+    if (!selEdge || !prediction || aiAvailable === false) {
+      setAiEdge({ key: null, text: null });
+      setAiEdgeLoading(false);
+      return;
+    }
+    let alive = true;
+    setAiEdgeLoading(true);
+    const { key, ...edge } = selEdge;
+    api
+      .llmExplain({ prediction, panels: ["edge"], edge })
+      .then((res) => {
+        if (alive) setAiEdge({ key, text: res?.panels?.edge || null });
+      })
+      .catch(() => {
+        if (alive) setAiEdge({ key, text: null });
+      })
+      .finally(() => {
+        if (alive) setAiEdgeLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selEdge, prediction, aiAvailable]);
+
   return (
     <div>
       <div className="route-toggles">
@@ -508,6 +581,32 @@ export default function RouteMap({ activeRouteId = "suez", nodes = [] }) {
               ))}
             </div>
           )}
+          <div style={{ marginTop: 10 }}>
+            <AiSection
+              title="AI Checkpoint Insight"
+              text={selected === aiNode.id ? aiNode.text : null}
+              loading={aiNodeLoading}
+            />
+          </div>
+        </div>
+      )}
+
+      {selEdge && (
+        <div className="node-detail">
+          <div className="node-detail-head">
+            <div>
+              <span className="view-title">{selEdge.from} → {selEdge.to}</span>
+              <span className="tip-kind">
+                {selEdge.mode} · {selEdge.distance_km != null ? `${Math.round(selEdge.distance_km).toLocaleString()} km` : "—"} · ~{selEdge.baseline_days ?? "—"}d baseline
+              </span>
+            </div>
+            <button className="icon-btn" onClick={() => setSelEdge(null)} aria-label="Close">×</button>
+          </div>
+          <AiSection
+            title="AI Segment Insight"
+            text={selEdge.key === aiEdge.key ? aiEdge.text : null}
+            loading={aiEdgeLoading}
+          />
         </div>
       )}
     </div>

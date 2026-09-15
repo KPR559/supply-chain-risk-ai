@@ -165,33 +165,74 @@ export function overallReason({ prediction, explanation, critical }) {
 }
 
 /**
- * Compact "current situation" brief: verdict sentence + exposure sentence.
- * Purely rule-based over live data.
+ * Compact "current situation" brief: at most two short sentences. Purely
+ * rule-based over live data.
  */
 export function situationSummary({ prediction, critical, selectedShipment }) {
   const mc = prediction?.monte_carlo;
   const nodes = prediction?.node_predictions || [];
   const miss = mc?.p_miss_deadline ?? 0;
   const hasDeadline = mc?.deadline_date != null;
-  const id = selectedShipment?.id || prediction?.shipment_id || "This shipment";
-  const verdict = !hasDeadline
-    ? `${id} has no customer deadline set, so deadline risk cannot be assessed.`
-    : miss >= 0.6
-      ? `${id} is at critical risk of missing the customer deadline.`
-      : miss >= 0.35
-        ? `${id} is at risk of missing the customer deadline.`
-        : `${id} is currently on track for the customer deadline.`;
-  const exposures = (critical?.critical_nodes || [])
+  if (!hasDeadline) {
+    const id = selectedShipment?.id || prediction?.shipment_id || "This shipment";
+    return `${id} has no delivery deadline set, so deadline risk cannot be assessed.`;
+  }
+  const criticalPool = (critical?.critical_nodes || [])
     .slice(0, 3)
     .map((c) => c.label || c.node_id);
-  const pool = exposures.length
-    ? exposures
+  const pool = criticalPool.length
+    ? criticalPool
     : [...nodes].sort((a, b) => (b.delay_probability ?? 0) - (a.delay_probability ?? 0))
       .slice(0, 3).map((n) => n.label || n.node_id);
-  const exposure = pool.length
-    ? `The largest risk exposure is concentrated around ${pool.join(", ")}.`
-    : "No checkpoint stands out in the risk profile.";
-  return `${verdict} ${exposure}`;
+  if (pool.length === 0) {
+    return miss >= 0.6
+      ? "Critical delay risk detected."
+      : "The shipment is on track for its delivery deadline.";
+  }
+  const named = pool.length > 1
+    ? `${pool.slice(0, -1).join(", ")} and ${pool[pool.length - 1]}`
+    : pool[0];
+  if (miss >= 0.6) {
+    return `Critical delay risk detected. The shipment is likely to miss its delivery deadline due to disruptions near ${named}.`;
+  }
+  if (miss >= 0.35) {
+    return `Elevated delay risk. The shipment may miss its delivery deadline due to risks near ${named}.`;
+  }
+  return "The shipment is on track for its delivery deadline. No checkpoint breaches the risk threshold and the outlook is healthy.";
+}
+
+/**
+ * One-line, non-technical explanation for the headline risk band, phrased to
+ * be read directly under the score (e.g. "High risk because Suez Canal
+ * disruption contributes the largest delay exposure."). Rule-based only.
+ */
+export function riskHeadline({ prediction, explanation, critical }) {
+  const nodes = prediction?.node_predictions || [];
+  const band = riskBand(nodes, prediction?.monte_carlo);
+  if (band.band === "low" || band.band === "medium") {
+    return `${band.label} risk — route conditions are manageable.`;
+  }
+  const disrupted = nodes.filter((n) => n.regime === 1);
+  if (disrupted.length > 0) {
+    const names = disrupted.map((n) => n.label || n.node_id).join(", ");
+    return `${band.label} risk because ${names} ${disrupted.length === 1 ? "is" : "are"} under active disruption.`;
+  }
+  const topCrit = (critical?.critical_nodes || [])[0];
+  if (topCrit) {
+    const name = topCrit.label || topCrit.node_id;
+    return `${band.label} risk because ${name} contributes the largest delay exposure.`;
+  }
+  const topFactor = (explanation?.top_factors || [])[0];
+  if (topFactor && topFactor.contribution > 0) {
+    const cause = describeFactor(topFactor.name).label.toLowerCase();
+    const at = explanation?.node_label || explanation?.node_id;
+    return `${band.label} risk because ${cause}${at ? ` at ${at}` : ""} is elevating delay.`;
+  }
+  const worst = [...nodes].sort((a, b) => (b.delay_probability ?? 0) - (a.delay_probability ?? 0))[0];
+  if (worst) {
+    return `${band.label} risk because ${worst.label || worst.node_id} shows a high delay probability.`;
+  }
+  return `${band.label} risk based on current route conditions.`;
 }
 
 // Friendly display names for model feature names. Raw names are kept in

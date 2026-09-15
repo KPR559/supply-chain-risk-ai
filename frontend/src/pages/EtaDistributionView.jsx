@@ -4,11 +4,12 @@ import PercentileChart from "../components/PercentileChart.jsx";
 import PercentileSummary from "../components/PercentileSummary.jsx";
 import DeadlineRiskCard from "../components/DeadlineRiskCard.jsx";
 import DatesSummary from "../components/DatesSummary.jsx";
+import AiSection from "../components/llm/AiSection.jsx";
 import TabState from "../components/TabState.jsx";
 import { daysBetween } from "../models.js";
 
 export default function EtaDistributionView({ data }) {
-  const { prediction, selectedShipment, loading, apiError, onRetry, notify } = data;
+  const { prediction, selectedShipment, loading, apiError, onRetry, notify, ai, aiLoading } = data;
 
   const downloadChart = () => {
     const svg = document.querySelector(".distribution-chart .dist-svg");
@@ -81,7 +82,11 @@ export default function EtaDistributionView({ data }) {
 
           <PercentileSummary mc={mc} />
 
+          <AiSection title="AI ETA Interpretation" text={ai?.eta} loading={aiLoading} />
+
           <DeadlineRiskCard mc={mc} deadline={deadline} hasDeadline={hasDeadline} />
+
+          <AiSection title="AI Deadline Explanation" text={ai?.deadline} loading={aiLoading} />
 
           {hasDeadline && (
             <DatesSummary

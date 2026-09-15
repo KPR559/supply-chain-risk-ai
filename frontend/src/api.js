@@ -100,6 +100,20 @@ export const api = {
     post("/compare-routes", { shipment_id: shipmentId, objectives }),
   explain: (shipmentId) => get(`/explanation/${shipmentId}`),
   critical: (shipmentId) => get(`/critical-nodes/${shipmentId}`),
+  llmExplain: ({ prediction, explanation = null, recommendations = null, panels = null, trend = null, nodeId = null, edge = null }) =>
+    post("/llm/explain", {
+      prediction,
+      explanation,
+      recommendations,
+      panels,
+      trend,
+      node_id: nodeId,
+      edge,
+    }),
+  llmChat: (prediction, question, history = []) =>
+    post("/llm/chat", { prediction, question, history }),
+  llmReport: (prediction, explanation = null, critical = null) =>
+    post("/llm/report", { prediction, explanation, critical }),
   graph: (routeId) => get(`/graph/${routeId}`),
   graphs: () => get("/graphs"),
   metrics: () => get("/metrics"),

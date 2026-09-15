@@ -42,6 +42,32 @@ class CompareRoutesRequest(BaseModel):
     objectives: List[Literal["fastest", "lowest_risk", "lowest_uncertainty", "balanced"]] = ["fastest", "lowest_risk", "balanced"]
 
 
+class LLMExplainRequest(BaseModel):
+    """Payload for LLM narrative panels. ``prediction`` is the full stored
+    prediction dict (the engine already computed everything the LLM may cite)."""
+    prediction: Dict[str, Any]
+    explanation: Optional[Dict[str, Any]] = None
+    critical: Optional[Dict[str, Any]] = None
+    recommendations: Optional[List[Dict[str, Any]]] = None
+    panels: Optional[List[str]] = Field(default=None, description="Panels to generate (situation|risk|recommendations|eta|deadline|drivers|trend|node|edge)")
+    trend: Optional[Dict[str, Any]] = None
+    node_id: Optional[str] = None
+    node: Optional[Dict[str, Any]] = None
+    edge: Optional[Dict[str, Any]] = None
+
+
+class LLMChatRequest(BaseModel):
+    prediction: Dict[str, Any]
+    question: str = Field(min_length=1, max_length=1000)
+    history: Optional[List[Dict[str, str]]] = None
+
+
+class LLMReportRequest(BaseModel):
+    prediction: Dict[str, Any]
+    explanation: Optional[Dict[str, Any]] = None
+    critical: Optional[Dict[str, Any]] = None
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str

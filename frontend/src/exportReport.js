@@ -71,8 +71,10 @@ export function exportNodesCsv({ prediction, selectedShipment }) {
 /**
  * Formatted PDF intelligence report for the current shipment.
  * jspdf is dynamically imported so it stays out of the main bundle.
+ * `aiSummary` is optional LLM-generated Markdown (Executive Summary),
+ * cleaned of markdown syntax before rendering.
  */
-export async function exportPdfReport({ prediction, explanation, critical, selectedShipment }) {
+export async function exportPdfReport({ prediction, explanation, critical, selectedShipment, aiSummary = null }) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const M = 15;
@@ -153,10 +155,32 @@ export async function exportPdfReport({ prediction, explanation, critical, selec
   row("Simulations", mc?.n_simulations?.toLocaleString() ?? "—");
   y += 3;
 
+function stripMarkdown(md) {
+  return String(md || "")
+    .split("\n")
+    .map((ln) =>
+      ln
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^\s*[-*]\s+/, "• ")
+        .replace(/^\s*>\s?/, "")
+        .replace(/[*_`]/g, "")
+        .trimEnd()
+    )
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
   heading("Risk Assessment");
   const miss = mc?.p_miss_deadline ?? 0;
   para(`Verdict: ${missVerdict(miss, mc?.deadline_date != null).label}. ${overallReason({ prediction, explanation, critical })}`);
   y += 1;
+
+  if (aiSummary) {
+    heading("AI Executive Summary");
+    para(stripMarkdown(aiSummary));
+    y += 1;
+  }
 
   heading("Recommended Actions");
   const recs = buildRecommendations({ prediction, explanation, critical });

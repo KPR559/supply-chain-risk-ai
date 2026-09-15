@@ -8,6 +8,7 @@ import EtaPreviewCard from "../components/EtaPreviewCard.jsx";
 import RiskSummaryCard from "../components/RiskSummaryCard.jsx";
 import RiskDriversCard from "../components/RiskDriversCard.jsx";
 import RecommendationList from "../components/RecommendationList.jsx";
+import AiSection from "../components/llm/AiSection.jsx";
 import CriticalPreview from "../components/CriticalPreview.jsx";
 import ModelDataQuality from "../components/ModelDataQuality.jsx";
 import DashboardFooter from "../components/DashboardFooter.jsx";
@@ -56,6 +57,9 @@ export default function PredictionResultsView({ data }) {
     lastUpdated,
     alertsOpen,
     setAlertsOpen,
+    ai,
+    aiRecs,
+    aiLoading,
   } = data;
   const [exportOpen, setExportOpen] = useState(false);
   const [metrics, setMetrics] = useState(null);
@@ -97,8 +101,16 @@ export default function PredictionResultsView({ data }) {
     setExportOpen(false);
     try {
       if (kind === "pdf") {
-        await exportPdfReport({ prediction, explanation, critical, selectedShipment });
-        if (notify) notify("PDF report downloaded.");
+        // The LLM report never blocks the export — it is skipped on failure.
+        let aiSummary = null;
+        try {
+          const rep = await api.llmReport(prediction, explanation, critical);
+          aiSummary = rep?.markdown || null;
+        } catch {
+          aiSummary = null;
+        }
+        await exportPdfReport({ prediction, explanation, critical, selectedShipment, aiSummary });
+        if (notify) notify(aiSummary ? "PDF report downloaded (with AI summary)." : "PDF report downloaded.");
       } else if (kind === "json") {
         exportJsonSnapshot({ prediction, explanation, critical, selectedShipment });
         if (notify) notify("JSON snapshot downloaded.");
@@ -194,26 +206,10 @@ export default function PredictionResultsView({ data }) {
         <>
           <ShipmentSummaryCard shipment={selectedShipment} prediction={prediction} risk={risk} />
 
-          <section className="panel compact situation-panel" aria-label="Current situation">
-            <span className="summary-label">Current situation</span>
-            <p>{situation}</p>
-            {onNavigate && (
-              <div className="situation-actions">
-                <button className="btn ghost mini-btn" onClick={() => onNavigate("checkpoints")}>
-                  View Critical Checkpoints
-                </button>
-                <button className="btn ghost mini-btn" onClick={() => onNavigate("compare")}>
-                  Compare Routes
-                </button>
-              </div>
-            )}
-          </section>
+
+          <AiSection title="Current situation" text={ai?.situation} loading={aiLoading} />
 
           <KpiGrid prediction={prediction} critical={critical} />
-
-          <RouteOverviewCard route={route} prediction={prediction} shipment={selectedShipment} onNavigate={onNavigate} />
-
-          <EtaPreviewCard prediction={prediction} selectedShipment={selectedShipment} onNavigate={onNavigate} />
 
           <div className="dash-pair">
             <RiskSummaryCard
@@ -221,29 +217,21 @@ export default function PredictionResultsView({ data }) {
               explanation={explanation}
               critical={critical}
               lastUpdated={lastUpdated}
+              aiRisk={ai?.risk}
+              aiLoading={aiLoading}
             />
-            <CriticalPreview critical={critical} prediction={prediction} onNavigate={onNavigate} />
-          </div>
-
-          <div className="dash-pair">
-            <RiskDriversCard explanation={explanation} onNavigate={onNavigate} />
             <RecommendationList
               prediction={prediction}
               explanation={explanation}
               critical={critical}
               onNavigate={onNavigate}
               onExport={() => runExport("pdf")}
+              aiRecs={aiRecs}
+              aiLoading={aiLoading}
             />
+            
           </div>
-
-          <ModelDataQuality
-            metrics={metrics}
-            dq={dq}
-            health={health}
-            prediction={prediction}
-            lastUpdated={lastUpdated}
-          />
-
+          
           <DashboardFooter
             health={health}
             prediction={prediction}
